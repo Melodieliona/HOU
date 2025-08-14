@@ -12,7 +12,7 @@ use crate::tree::State;
 
 fn main() {
     //Erzeuge Terme
-    let constraint = match parse("λx. (λx. x) x ?= λf. f g") {
+    let constraint = match parse("λx , e. a ?= λy. b") {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Parser-Fehler: {}", e);
@@ -22,15 +22,12 @@ fn main() {
     //Erzeuge Baum zum speichern und abrufen
     let initial_state = State::new(vec![constraint]);
     let mut root = Node::new(initial_state);
+
     // Randomisierte Expansion bis zur Lösung aller Constraints
     random_unify(&mut root);
-    // 1.6 print_succeed_states() aufrufen → Alle Lösungen ausgeben
+    // print_succeed_states() aufrufen .Alle Lösungen ausgeben
     println!("\nGefundene Succeed-States:");
     root.print_succeed_states();
-
-    //Testausgaben von Main aus
-    let x = parse("λx. (λx. x) x ?= λf. f g");
-    println!("{:#?}", x);
 }
 
 fn random_unify(root: &mut Node) {
@@ -42,6 +39,7 @@ fn random_unify(root: &mut Node) {
         pending.clear();
         Node::collect_pending_nodes(root, &mut pending);
 
+        println!("⟳ Pending-Nodes: {}", pending.len());
         // Abbruch, wenn nichts mehr offen ist
         if pending.is_empty() {
             break;

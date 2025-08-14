@@ -27,7 +27,7 @@ impl PersistentSubst {
         PersistentSubst(None)
     }
 
-    /// Fügt eine neue Bindung an den Kopf
+    // Fügt eine neue Bindung an den Kopf
     pub fn push(self, var: String, val: Term) -> Self {
         let head = Rc::new(SubstEntry {
             var,
@@ -37,7 +37,7 @@ impl PersistentSubst {
         PersistentSubst(Some(head))
     }
 
-    /// In eine HashMap umwandeln
+    // In eine HashMap umwandeln
     pub fn to_hashmap(&self) -> HashMap<String, Term> {
         let mut map = HashMap::new();
         let mut cur = self.0.clone();
@@ -49,7 +49,7 @@ impl PersistentSubst {
     }
 }
 
-/// Unifikationsstatus
+// Unifikationsstatus
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Status {
     Pending,
@@ -57,7 +57,7 @@ pub enum Status {
     Fail,
 }
 
-/// Ein Unifikationszustand
+// Ein Unifikationszustand
 #[derive(Clone, Debug)]
 pub struct State {
     constraints: Constraints,
@@ -74,6 +74,16 @@ impl State {
             failed: false,
         }
     }
+
+    // Wie new, aber erbt statt leerer Substitution die gegebene.
+    pub fn with_subst(constraints: Vec<Constraint>, subst: PersistentSubst) -> Self {
+        State {
+            constraints,
+            subst,
+            failed: false,
+        }
+    }
+
     //Zweig fehlgeschlagen
     pub fn fail() -> Self {
         State {
@@ -83,7 +93,7 @@ impl State {
         }
     }
     //Zweig gelöst
-    pub fn is_solved(&self) -> bool {
+    fn is_solved(&self) -> bool {
         self.constraints.is_empty() && !self.failed
     }
     //Gibt Status aus
@@ -98,7 +108,7 @@ impl State {
     }
 }
 
-/// Generischer Baumknoten
+// Baumknoten
 #[derive(Debug)]
 pub struct Node {
     value: State,
@@ -148,21 +158,24 @@ impl Node {
     }
 
     /// Postorder nur für Succeed State
-    pub fn traverse_succeed_bottom_up<F>(&self, f: &mut F)
+    pub fn traverse_succeed_leaves<F>(&self, f: &mut F)
     where
         F: FnMut(&State),
     {
-        for c in &self.children {
-            c.traverse_succeed_bottom_up(f);
-        }
-        if self.value.status() == Status::Succeed {
-            f(&self.value);
+        if self.children.is_empty() {
+            if self.value.status() == Status::Succeed {
+                f(&self.value);
+            }
+        } else {
+            for c in &self.children {
+                c.traverse_succeed_leaves(f);
+            }
         }
     }
 
     // Ruft traverse_succeed_bottom_up auf und druckt jeden Succeed-State
     pub fn print_succeed_states(&self) {
-        self.traverse_succeed_bottom_up(&mut |st| {
+        self.traverse_succeed_leaves(&mut |st| {
             println!("Succeed-State gefunden: {:?}", st);
         });
     }
@@ -178,26 +191,28 @@ impl Node {
         pendings.choose(&mut rng).cloned()
     }
 
-    /// 1. Nur ein Constraint abarbeiten und Kinder erzeugen
+    // Nur ein Constraint abarbeiten und Kinder erzeugen
     pub fn expand_one(&mut self) {
-        if self.value.constraints.is_empty() {
-            return;
-        }
-
-        // Erstes Constraint ziehen
-        let c = self.value.constraints.remove(0);
-
+        let (head, tail) = match self.value.constraints.split_first() {
+            Some((first, rest)) => (first.clone(), rest.to_vec()),
+            None => return,
+        };
+        println!("expand_one auf Constraint {:?}", head);
         // Unifikationsregeln anwenden
-        let successors = unification::apply_unify_rules(c, &self.value.subst);
-
+        let successors = unification::apply_unify_rules(head.clone(), &self.value.subst);
         // Für jeden neuen State ein Kind anfügen
-        for state in successors {
+        self.value.constraints.clear();
+        self.value.constraints.shrink_to_fit();
+
+        for mut state in successors {
+            //constraints des Parent
+            state.constraints.extend(tail.iter().cloned());
             let child = Node::new(state);
             self.children.push(child);
         }
     }
 
-    /// 2. Alle Nodes sammeln, die noch Constraints übrig haben
+    //Alle Nodes sammeln, die noch Constraints übrig haben
     pub fn collect_pending_nodes(node: &mut Node, out: &mut Vec<*mut Node>) {
         if !node.value.constraints.is_empty() {
             out.push(node as *mut _);

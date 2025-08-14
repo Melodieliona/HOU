@@ -1,46 +1,53 @@
-use crate::term::*;
+use crate::term::{Constraint, Term};
+use crate::tree::{PersistentSubst, State};
 
-// Zerlegt einen Term der Form `a s1 … sm` in `(head, [s1, …, sm])`.
-// Falls kein Application-Konstrukt vorliegt, liefert es `(term, [])`.
-fn head_and_args(term: &Term) -> (&Term, Vec<&Term>) {
-    let mut args = Vec::new();
+//Funktion, die vector von binder namen, head, vector von argumenten zurück gibt
+fn flatten_hnf(term: &Term) -> (Vec<&String>, &Term, Vec<&Term>) {
+    // sammelt binder, gibt rest in cur aus
+    let mut binders = Vec::new();
     let mut cur = term;
-    // so lange `cur` eine Applikation ist, schraube ab und speichere das Argument
-    while let Term::App(fun, arg) = cur {
-        args.push(&**arg);
-        cur = &**fun;
+    while let Term::Abs(param, body) = cur {
+        binders.push(param);
+        cur = body;
     }
-    (cur, args)
+
+    // Kopf + Argumente
+    let mut args = Vec::new();
+    let mut head = cur;
+    while let Term::App(fun, arg) = head {
+        args.push(arg.as_ref());
+        head = fun.as_ref();
+    }
+    args.reverse();
+
+    (binders, head, args)
 }
 
-// Ein Term ist in Kopfnormalform, wenn er
-// Abs(x, body) ist und `body` die Form `a s1 … sm` hat,
-// wobei `a` FVar, BVar oder Const ist.
-fn is_hnf(term: &Term) -> bool {
-    match term {
-        Term::Abs(_, body) => {
-            let (head, _) = head_and_args(body);
-            matches!(head, Term::FVar(_) | Term::BVar(_) | Term::Const(_))
-        }
-        _ => false,
-    }
+pub fn is_decomposable(lhs: &Term, rhs: &Term) -> bool {
+    println!("Is decomposable? ");
+    let (b1, h1, a1) = flatten_hnf(lhs);
+    let (b2, h2, a2) = flatten_hnf(rhs);
+
+    b1 == b2
+        && matches!(h1, Term::Const(_) | Term::BVar(_))
+        && matches!(h2, Term::Const(_) | Term::BVar(_))
+        && h1 == h2
+        && a1.len() == a2.len()
 }
 
-//Prüft, ob beide Terme in hnf sind, denselben Binder x haben und denselben Head a.
-// Liefert dann die Argumentlisten ([s1,…,sm], [t1,…,tm]) zurück.
-pub fn can_decompose<'a>(
-    t1: &'a Term,
-    t2: &'a Term,
-) -> Option<(String, Vec<&'a Term>, Vec<&'a Term>)> {
-    if let (Term::Abs(x1, body1), Term::Abs(x2, body2)) = (t1, t2) {
-        if x1 == x2 && is_hnf(t1) && is_hnf(t2) {
-            let (head1, args1) = head_and_args(body1);
-            let (head2, args2) = head_and_args(body2);
-            // Head-Vergleich über PartialEq
-            if head1 == head2 {
-                return Some((x1.clone(), args1, args2));
-            }
-        }
-    }
-    None
+// Erzeugt Constraints
+pub fn apply_decompose(constraint: Constraint, subst: &PersistentSubst) -> Vec<State> {
+    let Constraint(lhs, rhs) = constraint;
+    let (_b, _h, args_l) = flatten_hnf(&lhs);
+    let (_b, _h, args_r) = flatten_hnf(&rhs);
+
+    let new_constraints = args_l
+        .into_iter()
+        .zip(args_r.into_iter())
+        .map(|(l, r)| Constraint(l.clone(), r.clone()))
+        .collect();
+
+    println!("Decomposed: {:?}", &new_constraints);
+
+    vec![State::with_subst(new_constraints, subst.clone())]
 }

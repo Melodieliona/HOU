@@ -219,18 +219,5 @@ pub fn parse(input: &str) -> Result<Constraint, ParseError> {
     //Zuerst den String in Token umwandeln
     let tokens = tokenize(input)?;
     //Term Struktur mit Token aufbauen
-    println!("It works");
     parser(&tokens)
-}
-
-impl fmt::Display for Term {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Term::FVar(name) => write!(f, "FVar {}", name),
-            Term::BVar(name) => write!(f, "BVar {}", name),
-            Term::Const(val) => write!(f, "Const {}", val),
-            Term::Abs(p, body) => write!(f, "Abs (λ{}. {})", p, body),
-            Term::App(func, arg) => write!(f, "App ({} {})", func, arg),
-        }
-    }
 }

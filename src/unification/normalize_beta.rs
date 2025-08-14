@@ -1,3 +1,64 @@
-pub fn write() {
-    println!("Hello");
+use crate::term::{Constraint, Term};
+use crate::tree::{PersistentSubst, State};
+
+// Prüft, ob beide Seiten eine λ-Abstraktion mit demselben Binder x haben
+// und mindestens eine Seite nicht in Head-Normal form ist.
+pub fn is_normalizable_beta(lhs: &Term, rhs: &Term) -> bool {
+    match (lhs, rhs) {
+        (Term::Abs(x1, s), Term::Abs(x2, t)) if x1 == x2 => !is_hnf(&*s) || !is_hnf(&*t),
+        _ => false,
+    }
+}
+
+// Wendet β-Normierung auf den Rumpf an: λx.s ? λx.t → λx.s↓h ? λx.t↓h
+pub fn apply_normalize_beta(constraint: Constraint, subst: &PersistentSubst) -> Vec<State> {
+    let Constraint(lhs, rhs) = constraint;
+    if let (Term::Abs(param, s), Term::Abs(_, t)) = (lhs.clone(), rhs.clone()) {
+        let s_hnf = head_normalize(*s);
+        let t_hnf = head_normalize(*t);
+        let new_l = Term::Abs(param.clone(), Box::new(s_hnf));
+        let new_r = Term::Abs(param.clone(), Box::new(t_hnf));
+        let st = State::with_subst(vec![Constraint(new_l, new_r)], subst.clone());
+        return vec![st];
+    }
+    vec![]
+}
+
+// Ist der Term bereits in Head-Normalform?
+fn is_hnf(term: &Term) -> bool {
+    match term {
+        Term::Abs(_, _) => true,
+        Term::App(f, _) => !matches!(&**f, Term::Abs(_, _)),
+        _ => true,
+    }
+}
+
+// Reduziert links-äußerste β-Redexe bis zur HNF
+fn head_normalize(mut t: Term) -> Term {
+    loop {
+        if let Term::App(ref f, ref a) = t {
+            if let Term::Abs(ref param, ref body) = **f {
+                // β-Redex: (λparam. body) a
+                t = substitute(&*body, &param, &*a);
+                continue;
+            }
+        }
+        break;
+    }
+    t
+}
+
+// Einfache Substitution param ↦ arg (ohne Capture-Vermeidung!)
+fn substitute(term: &Term, param: &str, arg: &Term) -> Term {
+    match term {
+        Term::BVar(n) if n == param => arg.clone(),
+        Term::BVar(n) => Term::BVar(n.clone()),
+        Term::FVar(_) | Term::Const(_) => term.clone(),
+        Term::App(f, a) => Term::App(
+            Box::new(substitute(f, param, arg)),
+            Box::new(substitute(a, param, arg)),
+        ),
+        Term::Abs(p, b) if p == param => Term::Abs(p.clone(), b.clone()),
+        Term::Abs(p, b) => Term::Abs(p.clone(), Box::new(substitute(b, param, arg))),
+    }
 }
