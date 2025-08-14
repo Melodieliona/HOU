@@ -39,7 +39,7 @@ fn random_unify(root: &mut Node) {
         pending.clear();
         Node::collect_pending_nodes(root, &mut pending);
 
-        println!("⟳ Pending-Nodes: {}", pending.len());
+        println!("Pending-Nodes: {}", pending.len());
         // Abbruch, wenn nichts mehr offen ist
         if pending.is_empty() {
             break;
