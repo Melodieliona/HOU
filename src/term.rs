@@ -1,3 +1,4 @@
+use std::fmt;
 //Aufbau vom Term
 #[derive(Clone, Debug, PartialEq)]
 pub enum Term {
@@ -113,4 +114,33 @@ pub enum BaseType {
 pub enum Type {
     Base(BaseType),
     Arrow(Box<Type>, Box<Type>), // Funktions­typ τ1 → τ2
+}
+
+impl fmt::Display for Term {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Term::FVar(name, _ty) => write!(f, "{}", name),
+            Term::BVar(name, _ty) => write!(f, "{}", name),
+            Term::Const(c, _ty) => write!(f, "{}", c),
+
+            Term::App(fun, arg, _ty) => {
+                write!(f, "{}", fun)?;
+                match &**arg {
+                    Term::App(_, _, _) | Term::Abs(_, _, _) => write!(f, " ({})", arg),
+                    _ => write!(f, " {}", arg),
+                }
+            }
+
+            Term::Abs(param, _ty, body) => {
+                write!(f, "λ{}. {}", param, body)
+            }
+        }
+    }
+}
+
+impl fmt::Display for Constraint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Constraint(lhs, rhs) = self;
+        write!(f, "{} = {}", lhs, rhs)
+    }
 }

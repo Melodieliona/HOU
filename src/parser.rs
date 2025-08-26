@@ -163,7 +163,10 @@ fn parse_term(tokens: &[Token], pos: &mut usize) -> Result<Term, ParseError> {
         let func_ty = node.get_type().clone();
         let (ty_in, ty_out) = match func_ty {
             Type::Arrow(i, o) => (i, o),
-            _ => return Err(ParseError::InvalidExpression),
+            _ => {
+                println!("a");
+                return Err(ParseError::InvalidExpression);
+            }
         };
         if &*ty_in != rhs.get_type() {
             return Err(ParseError::InvalidExpression);
@@ -278,8 +281,10 @@ fn parse_type(tokens: &[Token], pos: &mut usize) -> Result<Type, ParseError> {
             // BaseType zusammensetzen
             let mut name = c.to_string();
             *pos += 1;
-            while let Some(Letter(c2)) = tokens.get(*pos) {
-                if c2.is_ascii_alphabetic() {
+            let base_types = ["Bool", "Nat", "Int", "Real"];
+            while let Some(Token::Letter(c2)) = tokens.get(*pos) {
+                let extended = format!("{}{}", name, c2);
+                if base_types.iter().any(|t| t.starts_with(&extended)) {
                     name.push(*c2);
                     *pos += 1;
                 } else {
@@ -292,6 +297,7 @@ fn parse_type(tokens: &[Token], pos: &mut usize) -> Result<Type, ParseError> {
                 "Int" => Type::Base(BaseType::Int),
                 "Real" => Type::Base(BaseType::Real),
                 other => {
+                    println!("Name ist gerade {}", name);
                     return Err(ParseError::UnexpectedToken(Token::Letter(
                         other.chars().next().unwrap(),
                     )));

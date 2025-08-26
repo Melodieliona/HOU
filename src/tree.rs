@@ -197,7 +197,7 @@ impl Node {
             Some((first, rest)) => (first.clone(), rest.to_vec()),
             None => return,
         };
-        println!("expand_one auf Constraint {:?}", head);
+        println!("expand_one auf Constraint {}", head);
         // Unifikationsregeln anwenden
         let successors = unification::apply_unify_rules(head.clone(), &self.value.subst);
         // Für jeden neuen State ein Kind anfügen

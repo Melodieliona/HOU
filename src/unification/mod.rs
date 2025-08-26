@@ -26,7 +26,7 @@ pub fn apply_unify_rules(constraint: Constraint, subst: &PersistentSubst) -> Vec
     );
 
     // 2) Logging wie gehabt
-    println!("▶ apply_unify_rules: LHS = {:?}, RHS = {:?}", lhs, rhs);
+    println!("▶ apply_unify_rules: LHS = {}, RHS = {}", lhs, rhs);
 
     //Normalize an: ({λxm.s ? = λyn.t}⊎E,σ) −→ ({λxm.s ? = λxm.t′xn+1...xm}⊎E,σ)
     if normalize_an::is_normalizable_an(&lhs, &rhs) {

@@ -12,13 +12,15 @@ use crate::tree::State;
 
 fn main() {
     //Erzeuge Terme
-    let constraint = match parse("h:Nat->Nat(F: Nat-> Nat a: Nat) ?= h: Nat(G: Nat-> Nat b:Nat)") {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Parser-Fehler: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let constraint =
+        match parse("h:Nat->Nat(F: Nat -> Nat a: Nat) ?= h: Nat->Nat(G: Nat-> Nat (b:Nat))") {
+            //match parse("a:Nat->Nat ?= a:Nat") {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Parser-Fehler: {}", e);
+                std::process::exit(1);
+            }
+        };
     //Erzeuge Baum zum speichern und abrufen
     let initial_state = State::new(vec![constraint]);
     let mut root = Node::new(initial_state);
