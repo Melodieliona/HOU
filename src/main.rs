@@ -12,7 +12,7 @@ use crate::tree::State;
 
 fn main() {
     //Erzeuge Terme
-    let constraint = match parse("λx , e. a ?= λy. b") {
+    let constraint = match parse("h:Nat->Nat(F: Nat-> Nat a: Nat) ?= h: Nat(G: Nat-> Nat b:Nat)") {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Parser-Fehler: {}", e);

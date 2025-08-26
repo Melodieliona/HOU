@@ -1,5 +1,8 @@
 use crate::term::Term;
-use std::collections::{HashMap, HashSet};
+use std::{
+    clone,
+    collections::{HashMap, HashSet},
+};
 
 /// Erzeugt fortlaufend frische Namen: x → x1, x2, …
 struct NameGenerator {
@@ -70,50 +73,50 @@ impl AlphaRenamer {
     // Sammelt alle freien Variablen in `used`
     fn collect_free_vars(&mut self, term: &Term) {
         match term {
-            Term::Const(c) => {
+            Term::Const(c, _) => {
                 self.used.insert(c.clone());
             }
 
-            Term::FVar(x) => {
+            Term::FVar(x, _) => {
                 self.used.insert(x.clone());
             }
 
-            Term::BVar(_) => {}
+            Term::BVar(_, _) => {}
 
-            Term::App(l, r) => {
+            Term::App(l, r, _) => {
                 self.collect_free_vars(l);
                 self.collect_free_vars(r);
             }
 
-            Term::Abs(x, body) => {
+            Term::Abs(x, _, body) => {
                 self.collect_free_vars(body);
                 self.used.remove(x);
             }
         }
     }
 
-    // Interne Rename-Funktion, rekursiv
+    // Rename-Funktion, rekursiv
     fn rename(&mut self, term: &Term) -> Term {
         match term {
-            Term::Const(c) => Term::Const(c.clone()),
+            Term::Const(c, ty) => Term::Const(c.clone(), ty.clone()),
 
-            Term::BVar(x) => {
+            Term::BVar(x, ty) => {
                 if let Some(new_name) = self.env.get(x) {
-                    Term::BVar(new_name.clone())
+                    Term::BVar(new_name.clone(), ty.clone())
                 } else {
-                    Term::BVar(x.clone())
+                    Term::BVar(x.clone(), ty.clone())
                 }
             }
 
-            Term::FVar(x) => Term::FVar(x.clone()),
+            Term::FVar(x, ty) => Term::FVar(x.clone(), ty.clone()),
 
-            Term::App(l, r) => {
-                let l2 = self.rename(l);
-                let r2 = self.rename(r);
-                Term::App(Box::new(l2), Box::new(r2))
+            Term::App(func, arg, ty) => {
+                let f2 = self.rename(func);
+                let a2 = self.rename(arg);
+                Term::App(Box::new(f2), Box::new(a2), ty.clone())
             }
 
-            Term::Abs(x, body) => {
+            Term::Abs(x, ty, body) => {
                 // Entscheide ob wir einen frischen Namen brauchen
                 let new_name = if self.used.contains(x) {
                     self.name_gen.fresh(&self.used)
@@ -131,7 +134,7 @@ impl AlphaRenamer {
                 // Scope verlassen – Env-Eintrag zurücknehmen
                 self.env.remove(x);
 
-                Term::Abs(new_name, Box::new(renamed_body))
+                Term::Abs(new_name, ty.clone(), Box::new(renamed_body))
             }
         }
     }

@@ -16,6 +16,8 @@ pub enum Token {
     LParen,
     RParen,
     Eq,
+    Colon,
+    Arrow, //vllt unnötig
 }
 
 //Fehler
@@ -90,6 +92,15 @@ fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
             ')' => tokens.push(RParen),
             '.' => tokens.push(Dot),
             ',' => tokens.push(Comma),
+            ':' => tokens.push(Colon),
+            '-' => {
+                if let Some(&(_, '>')) = chars.peek() {
+                    chars.next();
+                    tokens.push(Arrow);
+                } else {
+                    return Err(InvalidCharacter((i, c)));
+                }
+            }
             c if c.is_ascii_alphabetic() => tokens.push(Letter(c)),
             _ => {
                 return Err(InvalidCharacter((i, c)));
@@ -147,8 +158,20 @@ fn parse_term(tokens: &[Token], pos: &mut usize) -> Result<Term, ParseError> {
         Some(Lambda) | Some(Letter(_)) | Some(LParen)
     ) {
         let rhs = parse_atom(tokens, pos)?;
-        node = App(Box::new(node), Box::new(rhs));
+
+        // Typ-Konsistenz: Funktion muss Arrow sein
+        let func_ty = node.get_type().clone();
+        let (ty_in, ty_out) = match func_ty {
+            Type::Arrow(i, o) => (i, o),
+            _ => return Err(ParseError::InvalidExpression),
+        };
+        if &*ty_in != rhs.get_type() {
+            return Err(ParseError::InvalidExpression);
+        }
+        node = Term::App(Box::new(node), Box::new(rhs), (*ty_out).clone());
     }
+
+    //TODO: schauen ob unnötig bzw eig in unification
     node = alpha_rename(&node);
 
     Ok(node)
@@ -160,13 +183,21 @@ fn parse_atom(tokens: &[Token], pos: &mut usize) -> Result<Term, ParseError> {
         Some(Lambda) => {
             *pos += 1;
 
-            // Parameterliste sammeln (z. B. x, y, z)
+            // Parameterliste sammeln (x:Type,...,dot,body)
             let mut params = Vec::new();
             loop {
                 match tokens.get(*pos) {
-                    Some(Letter(c)) if c.is_lowercase() => {
-                        params.push(c.to_string());
+                    Some(Letter(c)) if c.is_lowercase() && !['f', 'g', 'h'].contains(&c) => {
+                        let name = c.to_string();
                         *pos += 1;
+
+                        //: erwartet
+                        if tokens.get(*pos) != Some(&Token::Colon) {
+                            return Err(ParseError::UnexpectedToken(tokens[*pos].clone()));
+                        }
+                        *pos += 1;
+                        let param_ty = parse_type(tokens, pos)?;
+                        params.push((name, param_ty));
                     }
                     Some(Comma) => {
                         *pos += 1; // nächster Parameter folgt
@@ -174,8 +205,13 @@ fn parse_atom(tokens: &[Token], pos: &mut usize) -> Result<Term, ParseError> {
                     Some(Dot) => {
                         *pos += 1; // Ende der Parameterliste
                         let mut body = parse_term(tokens, pos)?;
-                        for param in params.into_iter().rev() {
-                            body = Term::Abs(param, Box::new(body));
+                        for (param, param_ty) in params.into_iter().rev() {
+                            let ret_ty = body.get_type().clone();
+                            body = Term::Abs(
+                                param.clone(),
+                                Type::Arrow(Box::new(param_ty.clone()), Box::new(ret_ty.clone())),
+                                Box::new(body),
+                            );
                         }
                         break Ok(body);
                     }
@@ -190,12 +226,17 @@ fn parse_atom(tokens: &[Token], pos: &mut usize) -> Result<Term, ParseError> {
         Some(Letter(c)) => {
             *pos += 1;
             let name = c.to_string();
+            if tokens.get(*pos) != Some(&Colon) {
+                return Err(ParseError::UnexpectedToken(tokens[*pos].clone()));
+            }
+            *pos += 1;
+            let ty = parse_type(tokens, pos)?;
             if c.is_uppercase() {
-                Ok(FVar(name))
+                Ok(FVar(name, ty))
             } else if ["f", "h", "g"].contains(&name.as_str()) {
-                Ok(Const(name))
+                Ok(Const(name, ty))
             } else {
-                Ok(BVar(name))
+                Ok(BVar(name, ty))
             }
         }
         // Parenthesierte Sub-Expression
@@ -220,4 +261,52 @@ pub fn parse(input: &str) -> Result<Constraint, ParseError> {
     let tokens = tokenize(input)?;
     //Term Struktur mit Token aufbauen
     parser(&tokens)
+}
+
+fn parse_type(tokens: &[Token], pos: &mut usize) -> Result<Type, ParseError> {
+    let mut ty = match tokens.get(*pos) {
+        Some(LParen) => {
+            *pos += 1;
+            let inner = parse_type(tokens, pos)?;
+            if tokens.get(*pos) != Some(&RParen) {
+                return Err(ParseError::MissingParem);
+            }
+            *pos += 1;
+            inner
+        }
+        Some(Letter(c)) if c.is_ascii_alphabetic() => {
+            // BaseType zusammensetzen
+            let mut name = c.to_string();
+            *pos += 1;
+            while let Some(Letter(c2)) = tokens.get(*pos) {
+                if c2.is_ascii_alphabetic() {
+                    name.push(*c2);
+                    *pos += 1;
+                } else {
+                    break;
+                }
+            }
+            match name.as_str() {
+                "Bool" => Type::Base(BaseType::Bool),
+                "Nat" => Type::Base(BaseType::Nat),
+                "Int" => Type::Base(BaseType::Int),
+                "Real" => Type::Base(BaseType::Real),
+                other => {
+                    return Err(ParseError::UnexpectedToken(Token::Letter(
+                        other.chars().next().unwrap(),
+                    )));
+                }
+            }
+        }
+        _ => return Err(ParseError::InvalidExpression),
+    };
+
+    // ->
+    if let Some(Arrow) = tokens.get(*pos) {
+        *pos += 1;
+        let right = parse_type(tokens, pos)?;
+        ty = Type::Arrow(Box::new(ty), Box::new(right));
+    }
+
+    Ok(ty)
 }
