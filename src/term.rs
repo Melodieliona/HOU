@@ -85,6 +85,15 @@ impl Term {
             | Term::Abs(_, ty, _) => ty,
         }
     }
+
+    pub fn get_name(&self) -> &String {
+        match self {
+            Term::FVar(name, _) => name,
+            Term::BVar(name, _) => name,
+            Term::Const(name, _) => name,
+            _ => panic!("Term hat keinen Namen"),
+        }
+    }
 }
 
 //Aufbau Constraint
@@ -114,6 +123,18 @@ pub enum BaseType {
 pub enum Type {
     Base(BaseType),
     Arrow(Box<Type>, Box<Type>), // Funktions­typ τ1 → τ2
+}
+impl Type {
+    //zählt arrows
+    pub fn split_arrow(&self) -> (Vec<Type>, Type) {
+        let mut doms = Vec::new();
+        let mut rest = self.clone();
+        while let Type::Arrow(dom, cod) = rest {
+            doms.push((*dom).clone());
+            rest = (*cod).clone();
+        }
+        (doms, rest)
+    }
 }
 
 impl fmt::Display for Term {

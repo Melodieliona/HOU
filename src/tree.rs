@@ -1,7 +1,7 @@
 use crate::term::*;
-use crate::unification;
-use rand::{seq::SliceRandom, thread_rng};
-use std::collections::HashMap;
+use crate::unification::*;
+use std::collections::*;
+use std::fmt;
 use std::rc::Rc;
 
 //Speicherung aller Constraints und Substitutionen
@@ -47,6 +47,19 @@ impl PersistentSubst {
         }
         map
     }
+
+    pub fn pretty(&self) -> String {
+        let mut map = self.to_hashmap();
+        let mut names: Vec<String> = map.keys().cloned().collect();
+        names.sort();
+        let mut out = String::new();
+        for name in names {
+            if let Some(term) = map.remove(&name) {
+                out.push_str(&format!("{} ↦ {}\n", name, term));
+            }
+        }
+        out
+    }
 }
 
 // Unifikationsstatus
@@ -60,9 +73,9 @@ pub enum Status {
 // Ein Unifikationszustand
 #[derive(Clone, Debug)]
 pub struct State {
-    constraints: Constraints,
-    subst: PersistentSubst,
-    failed: bool,
+    pub constraints: Vec<Constraint>,
+    pub subst: PersistentSubst,
+    pub failed: bool,
 }
 
 impl State {
@@ -106,119 +119,91 @@ impl State {
             Status::Pending
         }
     }
+    pub fn pretty_subst(&self) -> String {
+        format!("{}", self.subst)
+    }
 }
 
-// Baumknoten
-#[derive(Debug)]
-pub struct Node {
-    value: State,
-    children: Vec<Node>,
+pub struct Dovetail<I> {
+    streams: VecDeque<I>,
 }
 
-//Knoten des aktuellen Baumes der auf Unterzustände verweist
-impl Node {
-    //Getter für node
-    pub fn state(&self) -> &State {
-        &self.value
-    }
-    //Erstellt neue Node
-    pub fn new(value: State) -> Self {
-        Node {
-            value,
-            children: Vec::new(),
+impl<I> Dovetail<I> {
+    pub fn new(streams: Vec<I>) -> Self {
+        Dovetail {
+            streams: streams.into_iter().collect(),
         }
     }
-    //Hängt Kindknoten an
-    pub fn add_child(&mut self, c: Node) {
-        self.children.push(c)
-    }
+}
 
-    // Postorder (bottom-up), ruft callback **nach** den Kindern auf
-    pub fn traverse_bottom_up<F>(&self, f: &mut F)
-    where
-        F: FnMut(&State),
-    {
-        for c in &self.children {
-            c.traverse_bottom_up(f);
-        }
-        f(&self.value);
-    }
+impl<I> Iterator for Dovetail<I>
+where
+    I: Iterator<Item = State>,
+{
+    type Item = State;
 
-    // Postorder nur für Pending State
-    pub fn traverse_pending_bottom_up<F>(&self, f: &mut F)
-    where
-        F: FnMut(&State),
-    {
-        for c in &self.children {
-            c.traverse_pending_bottom_up(f);
-        }
-        if self.value.status() == Status::Pending {
-            f(&self.value);
-        }
-    }
-
-    /// Postorder nur für Succeed State
-    pub fn traverse_succeed_leaves<F>(&self, f: &mut F)
-    where
-        F: FnMut(&State),
-    {
-        if self.children.is_empty() {
-            if self.value.status() == Status::Succeed {
-                f(&self.value);
+    fn next(&mut self) -> Option<State> {
+        // Solange noch Streams da sind
+        while let Some(mut it) = self.streams.pop_front() {
+            if let Some(state) = it.next() {
+                // Wenn wir ein Ergebnis haben, requeue den Stream
+                self.streams.push_back(it);
+                return Some(state);
             }
-        } else {
-            for c in &self.children {
-                c.traverse_succeed_leaves(f);
+            // andernfalls: drop den leeren Stream und weiter
+        }
+        None
+    }
+}
+// Der Kern: baut für eine gegebene Konfiguration (Constraints + σ)
+// einen `Iterator<State>` auf, der lazily alle Lösungen liefert.
+pub fn unify_stream(
+    constraints: Vec<Constraint>,
+    subst: PersistentSubst,
+) -> Box<dyn Iterator<Item = State>> {
+    // 1) Wenn keine Constraints mehr offen sind, yield eine einzige State
+    if constraints.is_empty() {
+        let solved = State::with_subst(vec![], subst);
+        return Box::new(std::iter::once(solved));
+    }
+
+    // 2) Nimm die erste Constraint heraus und löse sie
+    let mut rest = constraints.clone();
+    let head = rest.remove(0);
+
+    // 3) Wende alle Unifizierungsregeln an → Vec<State>
+    let succs = apply_unify_rules(head.clone(), &subst);
+
+    // 4) Für jeden Nachfolger: kette seine Rest-Constraints an
+    //    und rufe unify_stream rekursiv lazily auf.
+    let sub_iters: Vec<Box<dyn Iterator<Item = State>>> = succs
+        .into_iter()
+        .map(move |mut st| {
+            st.constraints.extend(rest.clone());
+            Box::new(unify_stream(st.constraints, st.subst.clone()))
+                as Box<dyn Iterator<Item = State>>
+        })
+        .collect();
+    // 5) Dovetail über all diese Sub-Iteratoren
+    Box::new(Dovetail::new(sub_iters))
+}
+
+impl fmt::Display for PersistentSubst {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut map = self.to_hashmap();
+        let mut names: Vec<_> = map.keys().cloned().collect();
+        names.sort();
+        for name in names {
+            if let Some(term) = map.remove(&name) {
+                writeln!(f, "{} ↦ {}", name, term)?;
             }
         }
+        Ok(())
     }
+}
 
-    // Ruft traverse_succeed_bottom_up auf und druckt jeden Succeed-State
-    pub fn print_succeed_states(&self) {
-        self.traverse_succeed_leaves(&mut |st| {
-            println!("Succeed-State gefunden: {:?}", st);
-        });
-    }
-
-    // Sammelt alle Pending-States und wählt einen zufällig aus
-    fn pick_random_pending(root: &Node) -> Option<State> {
-        // Alle Pending-States in einen Vec sammeln
-        let mut pendings = Vec::new();
-        root.traverse_pending_bottom_up(&mut |st| pendings.push(st.clone()));
-
-        // Mit dem Zufallsgenerator einen auswählen
-        let mut rng = thread_rng();
-        pendings.choose(&mut rng).cloned()
-    }
-
-    // Nur ein Constraint abarbeiten und Kinder erzeugen
-    pub fn expand_one(&mut self) {
-        let (head, tail) = match self.value.constraints.split_first() {
-            Some((first, rest)) => (first.clone(), rest.to_vec()),
-            None => return,
-        };
-        println!("expand_one auf Constraint {}", head);
-        // Unifikationsregeln anwenden
-        let successors = unification::apply_unify_rules(head.clone(), &self.value.subst);
-        // Für jeden neuen State ein Kind anfügen
-        self.value.constraints.clear();
-        self.value.constraints.shrink_to_fit();
-
-        for mut state in successors {
-            //constraints des Parent
-            state.constraints.extend(tail.iter().cloned());
-            let child = Node::new(state);
-            self.children.push(child);
-        }
-    }
-
-    //Alle Nodes sammeln, die noch Constraints übrig haben
-    pub fn collect_pending_nodes(node: &mut Node, out: &mut Vec<*mut Node>) {
-        if !node.value.constraints.is_empty() {
-            out.push(node as *mut _);
-        }
-        for child in &mut node.children {
-            Node::collect_pending_nodes(child, out);
-        }
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.subst)
     }
 }

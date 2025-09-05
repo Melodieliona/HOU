@@ -15,22 +15,11 @@ use crate::tree::{PersistentSubst, State};
 pub fn apply_unify_rules(constraint: Constraint, subst: &PersistentSubst) -> Vec<State> {
     let Constraint(lhs, rhs) = constraint.clone();
 
-    // 1) Typ-Sicherheit prüfen (nur im Debug-Build aktiv)
-    let Constraint(lhs, rhs) = constraint.clone();
-    assert_eq!(
-        lhs.get_type(),
-        rhs.get_type(),
-        "Unifikations-Constraint mit unterschiedlichen Typen: {:?} vs {:?}",
-        lhs.get_type(),
-        rhs.get_type()
-    );
-
-    // 2) Logging wie gehabt
     println!("▶ apply_unify_rules: LHS = {}, RHS = {}", lhs, rhs);
 
     //Normalize an: ({λxm.s ? = λyn.t}⊎E,σ) −→ ({λxm.s ? = λxm.t′xn+1...xm}⊎E,σ)
     if normalize_an::is_normalizable_an(&lhs, &rhs) {
-        println!("Yes! Normalize an!");
+        println!("Normalize an:");
         return normalize_an::apply_normalize_an(constraint.clone(), subst);
     }
     //Normalize ß : ({λx.s ? = λx.t} ⊎E,σ) −→ ({λx.s↓h ? = λx.t↓h}⊎E,σ)
@@ -60,8 +49,6 @@ pub fn apply_unify_rules(constraint: Constraint, subst: &PersistentSubst) -> Vec
     }
 
     //Bind        : ({ s ? = t}⊎E,σ) −→ ({s ? = t}⊎E,ϱσ)
-
-    println!("   –> Keine Regel gefunden, gebe Vec::new() zurück");
-    Vec::new()
+    return Bind::apply_bind(constraint, subst);
 }
 //pub use apply_unify_rules;
