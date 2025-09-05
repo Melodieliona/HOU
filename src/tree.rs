@@ -161,21 +161,20 @@ pub fn unify_stream(
     constraints: Vec<Constraint>,
     subst: PersistentSubst,
 ) -> Box<dyn Iterator<Item = State>> {
-    // 1) Wenn keine Constraints mehr offen sind, yield eine einzige State
+    //  Wenn keine Constraints mehr offen sind, yield einen einzigen State
     if constraints.is_empty() {
         let solved = State::with_subst(vec![], subst);
         return Box::new(std::iter::once(solved));
     }
 
-    // 2) Nimm die erste Constraint heraus und löse sie
+    // Nimm den ersten Constraint heraus und löse ihn
     let mut rest = constraints.clone();
     let head = rest.remove(0);
 
-    // 3) Wende alle Unifizierungsregeln an → Vec<State>
+    // Wende alle Unifizierungsregeln an -> Vec<State>
     let succs = apply_unify_rules(head.clone(), &subst);
 
-    // 4) Für jeden Nachfolger: kette seine Rest-Constraints an
-    //    und rufe unify_stream rekursiv lazily auf.
+    //  Für jeden Nachfolger: kette seine Rest-Constraints an und rufe unify_stream rekursiv lazily auf.
     let sub_iters: Vec<Box<dyn Iterator<Item = State>>> = succs
         .into_iter()
         .map(move |mut st| {
