@@ -1,0 +1,53 @@
+[
+  {
+    "name": "F",
+    "term_kind": "FVar",
+    "ty": {
+      "Arrow": [
+        "Nat",
+        "Nat"
+      ]
+    },
+    "var": "Basic"
+  },
+  {
+    "name": "G",
+    "term_kind": "FVar",
+    "ty": {
+      "Arrow": [
+        "Nat",
+        "Nat"
+      ]
+    },
+    "var": "Basic"
+  },
+  {
+    "name": "a",
+    "term_kind": "Const",
+    "ty": "Nat",
+    "var": "Basic"
+  },
+  {
+    "name": "b",
+    "term_kind": "Const",
+    "ty": "Nat",
+    "var": "Basic"
+  },
+  {
+    "name": "h",
+    "term_kind": "Const",
+    "ty": {
+      "Arrow": [
+        "Nat",
+        "Nat"
+      ]
+    },
+    "var": "Basic"
+  },
+  {
+    "name": "x",
+    "term_kind": "BVar",
+    "ty": "Nat",
+    "var": "Basic"
+  }
+]

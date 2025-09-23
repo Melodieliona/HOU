@@ -1,85 +1,101 @@
 // src/unification/hs_projection.rs
 
+use crate::counter::*;
 use crate::term::*;
 use crate::tree::*;
-use crate::unification::Bind::flatten_hnf;
+use crate::unification::unification_utils::*;
 use Type::Arrow;
 
 pub fn apply_hs_projection(
-    Constraint(lhs, rhs): Constraint,
-    subst: &PersistentSubst,
+    term: &Term,
+    state: &State,
+    config: &Config,
+    constraint: &Constraint,
 ) -> Vec<State> {
     // Kopf und gebundene Variablen extrahieren
-    let (_bs_s, head_s, _args_s) = flatten_hnf(&lhs);
-    let (f_name, f_ty) = head_s.get_fvar().unwrap();
+    let (_bs_s, head_s, _args_s) = flatten_hnf(term);
+    let var = match head_s.get_var() {
+        Some(v) => v,
+        None => return Vec::new(),
+    };
+    let f_name = &var.name;
 
-    //  Typ zerlegen in Domänen as und Zieltyp b
-    //TODO: alphas und beta statt ty_in ty_out im restlichen Code
-    let (alphas, beta) = f_ty.split_arrow();
-    let n = alphas.len();
-    if n == 0 {
+    let (alphas, beta) = var.ty.split_arrow();
+    if alphas.is_empty() {
         return Vec::new();
     }
 
+    let xs_vars = build_bound_vars(&alphas, "x");
+    let xs: Vec<Term> = xs_vars.iter().cloned().map(Term::Var).collect();
+
+    let binders = xs
+        .iter()
+        .map(|x| x.get_var().unwrap().clone())
+        .collect::<Vec<_>>();
+
     let mut results = Vec::new();
 
-    //  Für jede ai prüfen, ob ai = ys → b
+    //  Für jede ai prüfen, ob ai = ys -> b
     for (i, alpha_i) in alphas.iter().enumerate() {
-        let (gammas, ty_out) = alpha_i.split_arrow();
-        if ty_out != beta {
+        let (gammas, beta_i) = alpha_i.split_arrow();
+        if beta_i != beta {
             continue;
         }
 
-        // Gebundene Variablen x1…xn bauen
-        let xs: Vec<Term> = alphas
-            .iter()
-            .enumerate()
-            .map(|(j, ty)| Term::BVar(format!("x{}", j + 1), ty.clone()))
+        //  Frische Hilfsvariablen F1…Fm nur lokal als Term::FVar anlegen
+        let fm_terms = make_fm_terms(&alphas, &gammas, &f_name, &term);
+
+        //  Jede Fm auf x1…xn applizieren
+        let fm_apps: Vec<Term> = fm_terms
+            .into_iter()
+            .map(|fm| apply_to_args(fm, &xs))
             .collect();
 
-        //  Frische Hilfsvariablen F1…Fm nur lokal als Term::FVar anlegen
-        let mut fm_terms = Vec::new();
-        for (m, gamma_m) in gammas.iter().enumerate() {
-            // Typ Fm : a1→…→an→ym
+        let body = apply_to_args(xs[i].clone(), &fm_apps);
+        let lam = wrap_with_abstractions(&body, &binders);
+
+        let new_subst = state.subst.clone().push(f_name.clone(), lam);
+        let kind = if gammas.is_empty() {
+            BindingKind::SimpleProjection
+        } else {
+            BindingKind::FunctionalProjection
+        };
+
+        let new_state = try_binding(state, kind, 1, constraint, new_subst, config);
+        results.push(new_state);
+    }
+    results
+}
+
+fn make_fm_terms(alphas: &[Type], gammas: &[Type], f_name: &str, term: &Term) -> Vec<Term> {
+    let mut r#gen = init_fresh_gen(std::iter::once(term));
+    gammas
+        .iter()
+        .map(|gamma_m| {
             let fm_ty = alphas.iter().rev().fold(gamma_m.clone(), |acc, a| {
                 Arrow(Box::new(a.clone()), Box::new(acc))
             });
-            let fm = Term::FVar(format!("{}{}", f_name, m + 1), fm_ty);
-            fm_terms.push(fm);
+            let fm_name = r#gen.fresh(f_name);
+            Term::Var(Variable {
+                name: fm_name,
+                term_kind: TermKind::FVar,
+                ty: fm_ty,
+                var: Var::Basic,
+            })
+        })
+        .collect()
+}
+
+fn apply_to_args(mut func: Term, args: &[Term]) -> Term {
+    for x in args {
+        if let Arrow(dom, cod) = func.get_type().clone() {
+            assert_eq!(*dom, x.get_type());
+            func = Term::App {
+                func: Box::new(func),
+                arg: Box::new(x.clone()),
+                result_ty: *cod,
+            };
         }
-
-        //  Jede Fm auf x1…xn applizieren
-        let mut fm_apps = Vec::new();
-        for fm in fm_terms.iter() {
-            let mut t = fm.clone();
-            for x in &xs {
-                if let Arrow(alphas, beta) = t.get_type().clone() {
-                    // dom sollte gleich dem Typ von x sein
-                    assert_eq!(*alphas, *x.get_type());
-                    t = Term::App(Box::new(t), Box::new(x.clone()), *beta);
-                }
-            }
-            fm_apps.push(t);
-        }
-
-        //  Kopfvariable xᵢ auf alle Fⱼ-Anwendungen anwenden
-        let mut body = xs[i].clone();
-        for arg in fm_apps.into_iter() {
-            if let Arrow(alphas, beta) = body.get_type().clone() {
-                assert_eq!(*alphas, *arg.get_type());
-                body = Term::App(Box::new(body), Box::new(arg), *beta);
-            }
-        }
-
-        //  λx₁…xₙ. body bauen
-        let lam = xs.into_iter().rev().fold(body, |acc, x| {
-            Term::Abs(x.get_name().clone(), x.get_type().clone(), Box::new(acc))
-        });
-
-        //  Neue Substitution: F ↦ λ… und State erzeugen
-        let new_subst = subst.clone().push(f_name.clone(), lam);
-        results.push(State::with_subst(Vec::new(), new_subst));
     }
-
-    results
+    func
 }

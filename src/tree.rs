@@ -1,34 +1,48 @@
+use crate::counter::*;
 use crate::term::*;
 use crate::unification::*;
 use std::collections::*;
 use std::fmt;
 use std::rc::Rc;
 
-//Speicherung aller Constraints und Substitutionen
 type Constraints = Vec<Constraint>;
-type Substitution = HashMap<String, Term>;
 
-//Substitutionen als verkettete Liste
+//Speichert Substitutionen als verkettete Liste
 #[derive(Clone, Debug)]
 pub struct SubstEntry {
     var: String,
     val: Term,
-    //Zeiger auf vorherigen Eintrag
     prev: Option<Rc<SubstEntry>>,
 }
 
-//Verkettung von SubstEntry
+// Repräsentiert eine persistent verkettete Substitution
 #[derive(Clone, Debug)]
 pub struct PersistentSubst(pub Option<Rc<SubstEntry>>);
 
 impl PersistentSubst {
-    /// Erzeugt leere Substitution
+    // Erzeugt eine leere Substitution
     pub fn new() -> Self {
         PersistentSubst(None)
     }
+    // Sucht zuletzt gepushte Bindung für var oder gibt None zurück
+    pub fn lookup(&self, var: &str) -> Option<Term> {
+        let mut cur = self.0.clone();
+        while let Some(entry) = cur {
+            if entry.var == var {
+                return Some(entry.val.clone());
+            }
+            cur = entry.prev.clone();
+        }
+        None
+    }
 
-    // Fügt eine neue Bindung an den Kopf
+    // Fügt eine neue Bindung am Kopf hinzu, falls nicht schon identisch vorhanden
     pub fn push(self, var: String, val: Term) -> Self {
+        if let Some(old) = self.lookup(&var) {
+            if old == val {
+                return self;
+            }
+        }
         let head = Rc::new(SubstEntry {
             var,
             val,
@@ -37,7 +51,7 @@ impl PersistentSubst {
         PersistentSubst(Some(head))
     }
 
-    // In eine HashMap umwandeln
+    // Wandelt die verkettete Substitution in eine HashMap um
     pub fn to_hashmap(&self) -> HashMap<String, Term> {
         let mut map = HashMap::new();
         let mut cur = self.0.clone();
@@ -47,80 +61,58 @@ impl PersistentSubst {
         }
         map
     }
-
-    pub fn pretty(&self) -> String {
-        let mut map = self.to_hashmap();
-        let mut names: Vec<String> = map.keys().cloned().collect();
-        names.sort();
-        let mut out = String::new();
-        for name in names {
-            if let Some(term) = map.remove(&name) {
-                out.push_str(&format!("{} ↦ {}\n", name, term));
-            }
-        }
-        out
-    }
 }
 
-// Unifikationsstatus
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Status {
-    Pending,
-    Succeed,
-    Fail,
-}
-
-// Ein Unifikationszustand
 #[derive(Clone, Debug)]
 pub struct State {
     pub constraints: Vec<Constraint>,
     pub subst: PersistentSubst,
     pub failed: bool,
+    pub binding_counts: BindingCounts,
+    pub parent: Option<Rc<State>>,
 }
 
 impl State {
-    //Initialisiert neuen State mit keinen Substitutionen
+    // Erstellt einen neuen State mit Start-Constraints und leerer Subst
     pub fn new(constraints: Constraints) -> Self {
         State {
             constraints,
             subst: PersistentSubst::new(),
             failed: false,
+            binding_counts: BindingCounts::new(),
+            parent: None,
         }
     }
 
-    // Wie new, aber erbt statt leerer Substitution die gegebene.
-    pub fn with_subst(constraints: Vec<Constraint>, subst: PersistentSubst) -> Self {
+    // Erzeugt einen Nachfolge-State mit neuer Subst und aktuellen Counts
+    pub fn with_subst_and_count(
+        &self,
+        constraints: Vec<Constraint>,
+        subst: PersistentSubst,
+    ) -> Self {
         State {
             constraints,
             subst,
             failed: false,
+            binding_counts: self.binding_counts.clone(),
+            parent: Some(Rc::new(self.clone())),
         }
     }
 
-    //Zweig fehlgeschlagen
+    //Erzeugt einen fehlgeschlagenen State
     pub fn fail() -> Self {
         State {
             constraints: vec![],
             subst: PersistentSubst::new(),
             failed: true,
+            binding_counts: BindingCounts::new(),
+            parent: None,
         }
     }
-    //Zweig gelöst
+
+    // Prüft, ob alle Constraints gelöst und kein Fail-State vorhanden ist
     fn is_solved(&self) -> bool {
         self.constraints.is_empty() && !self.failed
-    }
-    //Gibt Status aus
-    pub fn status(&self) -> Status {
-        if self.failed {
-            Status::Fail
-        } else if self.is_solved() {
-            Status::Succeed
-        } else {
-            Status::Pending
-        }
-    }
-    pub fn pretty_subst(&self) -> String {
-        format!("{}", self.subst)
     }
 }
 
@@ -129,6 +121,7 @@ pub struct Dovetail<I> {
 }
 
 impl<I> Dovetail<I> {
+    // Baut eine neue Dovetail-Queue aus den gegebenen Iteratoren
     pub fn new(streams: Vec<I>) -> Self {
         Dovetail {
             streams: streams.into_iter().collect(),
@@ -142,52 +135,60 @@ where
 {
     type Item = State;
 
+    // Liefert im Round-Robin-Stil das nächste Element aus allen Streams
     fn next(&mut self) -> Option<State> {
-        // Solange noch Streams da sind
         while let Some(mut it) = self.streams.pop_front() {
             if let Some(state) = it.next() {
-                // Wenn wir ein Ergebnis haben, requeue den Stream
                 self.streams.push_back(it);
                 return Some(state);
             }
-            // andernfalls: drop den leeren Stream und weiter
         }
         None
     }
 }
-// Der Kern: baut für eine gegebene Konfiguration (Constraints + σ)
-// einen `Iterator<State>` auf, der lazily alle Lösungen liefert.
-pub fn unify_stream(
-    constraints: Vec<Constraint>,
-    subst: PersistentSubst,
-) -> Box<dyn Iterator<Item = State>> {
-    //  Wenn keine Constraints mehr offen sind, yield einen einzigen State
-    if constraints.is_empty() {
-        let solved = State::with_subst(vec![], subst);
-        return Box::new(std::iter::once(solved));
+
+// Baut einen lazily-evaluierenden Unifikations-Iterator für state
+pub fn unify_stream(state: &State, config: &Config) -> Box<dyn Iterator<Item = State>> {
+    //  Wenn keine Constraints mehr offen sind, liefert einen einzigen State
+    if state.constraints.is_empty() {
+        if state.is_solved() && !state.subst.to_hashmap().is_empty() {
+            return Box::new(std::iter::once(state.clone()));
+        } else {
+            return Box::new(std::iter::empty());
+        }
     }
 
-    // Nimm den ersten Constraint heraus und löse ihn
-    let mut rest = constraints.clone();
+    // Nimm den nächsten Constraint heraus und löst ihn
+    let mut rest = state.constraints.clone();
     let head = rest.remove(0);
 
     // Wende alle Unifizierungsregeln an -> Vec<State>
-    let succs = apply_unify_rules(head.clone(), &subst);
+    let raw_succs = unification::apply_unify_rules(head.clone(), &state, config)
+        .into_iter()
+        .filter(|s| !s.failed);
 
-    //  Für jeden Nachfolger: kette seine Rest-Constraints an und rufe unify_stream rekursiv lazily auf.
+    let mut seen_cs = std::collections::HashSet::new();
+    let succs: Vec<State> = raw_succs
+        .filter(|s| {
+            let key = s.constraints.clone();
+            seen_cs.insert(key)
+        })
+        .collect();
+
+    //  Für jeden Nachfolger rekursiv weiterführen
     let sub_iters: Vec<Box<dyn Iterator<Item = State>>> = succs
         .into_iter()
         .map(move |mut st| {
             st.constraints.extend(rest.clone());
-            Box::new(unify_stream(st.constraints, st.subst.clone()))
-                as Box<dyn Iterator<Item = State>>
+            Box::new(unify_stream(&st, config)) as Box<dyn Iterator<Item = State>>
         })
         .collect();
-    // 5) Dovetail über all diese Sub-Iteratoren
+
     Box::new(Dovetail::new(sub_iters))
 }
 
 impl fmt::Display for PersistentSubst {
+    // Formatiert die Substitution als sortierte Liste
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut map = self.to_hashmap();
         let mut names: Vec<_> = map.keys().cloned().collect();
@@ -202,6 +203,7 @@ impl fmt::Display for PersistentSubst {
 }
 
 impl fmt::Display for State {
+    // Gibt nur die Substitution aus
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.subst)
     }

@@ -1,159 +1,144 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
-//Aufbau vom Term
-#[derive(Clone, Debug, PartialEq)]
-pub enum Term {
-    FVar(String, Type),              // freie Variable Großbuchstaben
-    BVar(String, Type),              //gebundene Variable Kleinbuchstaben
-    Const(String, Type),             // f, g, h
-    Abs(String, Type, Box<Term>),    // λ-Abstraktion
-    App(Box<Term>, Box<Term>, Type), // Applikation funktion, argument
-}
-
-//Getter und Setter FUnktionen für Term
-impl Term {
-    //Getter
-    //FVar
-    pub fn get_fvar(&self) -> Option<(&String, &Type)> {
-        if let Term::FVar(name, ty) = self {
-            Some((name, ty))
-        } else {
-            None
-        }
-    }
-
-    //BVar
-    pub fn get_bvar(&self) -> Option<(&String, &Type)> {
-        if let Term::BVar(name, ty) = self {
-            Some((name, ty))
-        } else {
-            None
-        }
-    }
-    //Const
-    pub fn get_const(&self) -> Option<(&String, &Type)> {
-        if let Term::Const(name, ty) = self {
-            Some((name, ty))
-        } else {
-            None
-        }
-    }
-    //Abs
-    pub fn get_abs(&self) -> Option<(&String, &Type, &Term)> {
-        if let Term::Abs(param, ty, body) = self {
-            Some((param, ty, body))
-        } else {
-            None
-        }
-    }
-    //App
-    pub fn get_app(&self) -> Option<(&Term, &Term, &Type)> {
-        if let Term::App(func, arg, ty) = self {
-            Some((func, arg, ty))
-        } else {
-            None
-        }
-    }
-
-    //Setter
-    //Fvar
-    pub fn set_fvar(&mut self, new_name: String, new_ty: Type) {
-        *self = Term::FVar(new_name, new_ty);
-    }
-    //Bvar
-    pub fn set_bvar(&mut self, new_name: String, new_ty: Type) {
-        *self = Term::BVar(new_name, new_ty);
-    }
-    //Const
-    pub fn set_const(&mut self, new_name: String, new_ty: Type) {
-        *self = Term::Const(new_name, new_ty);
-    }
-    //Abs
-    pub fn set_abs(&mut self, param: String, ty: Type, body: Term) {
-        *self = Term::Abs(param, ty, Box::new(body));
-    }
-    //App
-    pub fn set_app(&mut self, func: Term, arg: Term, ty: Type) {
-        *self = Term::App(Box::new(func), Box::new(arg), ty);
-    }
-
-    pub fn get_type(&self) -> &Type {
-        match self {
-            Term::App(_, _, ty)
-            | Term::Const(_, ty)
-            | Term::FVar(_, ty)
-            | Term::BVar(_, ty)
-            | Term::Abs(_, ty, _) => ty,
-        }
-    }
-
-    pub fn get_name(&self) -> &String {
-        match self {
-            Term::FVar(name, _) => name,
-            Term::BVar(name, _) => name,
-            Term::Const(name, _) => name,
-            _ => panic!("Term hat keinen Namen"),
-        }
-    }
-}
-
-//Aufbau Constraint
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Constraint(pub Term, pub Term);
 
-impl Constraint {
-    //Getter links und rechts
-    pub fn left_term(&self) -> &Term {
-        &self.0
-    }
-    pub fn right_term(&self) -> &Term {
-        &self.1
-    }
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
+pub struct Variable {
+    pub name: String,        //F
+    pub term_kind: TermKind, // FVar
+    pub ty: Type,            // Nat  oder Nat->Nat
+    pub var: Var,            //Identification Variable
 }
 
-//Type-Struktur für Bind?
-// Fest vordefinierte Basissorten
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum BaseType {
-    Bool,
-    Nat,
-    Int,
-    Real,
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
+pub enum Var {
+    Identification,
+    Elimination,
+    Basic,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
+pub enum TermKind {
+    FVar,
+    BVar,
+    Const,
+    IVar,
+}
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
-    Base(BaseType),
-    Arrow(Box<Type>, Box<Type>), // Funktions­typ τ1 → τ2
+    Real,
+    Nat,
+    Bool,
+    Arrow(Box<Type>, Box<Type>),
+}
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
+pub enum Term {
+    #[allow(dead_code)]
+    Var(Variable),
+    Abs {
+        param: Variable,
+        body: Box<Term>,
+    },
+    App {
+        func: Box<Term>,
+        arg: Box<Term>,
+        result_ty: Type,
+    },
+}
+
+impl Term {
+    pub fn get_var(&self) -> Option<&Variable> {
+        match self {
+            Term::Var(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    // Gibt name und ty zurück, wenn dieser Term eine FVar ist
+    pub fn get_fvar(&self) -> Option<(&String, &Type)> {
+        if let Term::Var(v) = self {
+            if v.term_kind == TermKind::FVar {
+                return Some((&v.name, &v.ty));
+            }
+        }
+        None
+    }
+    // Liefert den Typ dieses Terms
+    pub fn get_type(&self) -> Type {
+        match self {
+            Term::Var(var) => var.ty.clone(),
+
+            Term::App { result_ty, .. } => result_ty.clone(),
+
+            Term::Abs { param, body } => {
+                // Pfeiltyp param.ty -> body.get_type()
+                let ret = body.get_type();
+                Type::Arrow(Box::new(param.ty.clone()), Box::new(ret))
+            }
+        }
+    }
+
+    //Gibt den TermKind des Kopfes des Terms wieder
+    pub fn get_termkind(&self) -> TermKind {
+        match self {
+            Term::Var(var) => var.term_kind.clone(),
+            Term::Abs { .. } => TermKind::BVar,
+            Term::App { func, .. } => func.get_termkind(),
+        }
+    }
 }
 impl Type {
     //zählt arrows
     pub fn split_arrow(&self) -> (Vec<Type>, Type) {
-        let mut doms = Vec::new();
+        let mut tys_in = Vec::new();
         let mut rest = self.clone();
-        while let Type::Arrow(dom, cod) = rest {
-            doms.push((*dom).clone());
-            rest = (*cod).clone();
+        while let Type::Arrow(ty_in, ty_out) = rest {
+            tys_in.push((*ty_in).clone());
+            rest = *ty_out;
         }
-        (doms, rest)
+        (tys_in, rest)
+    }
+}
+
+//------Display---------------------------------------------------------------------------
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Type::Real => write!(f, "Real"),
+            Type::Nat => write!(f, "Nat"),
+            Type::Bool => write!(f, "Bool"),
+            Type::Arrow(a, b) => write!(f, "{}->{}", a, b),
+        }
+    }
+}
+
+impl fmt::Display for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 
 impl fmt::Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Term::FVar(name, _ty) => write!(f, "{}", name),
-            Term::BVar(name, _ty) => write!(f, "{}", name),
-            Term::Const(c, _ty) => write!(f, "{}", c),
+            Term::Var(var) => write!(f, "{}", var),
 
-            Term::App(fun, arg, _ty) => {
-                write!(f, "{}", fun)?;
-                match &**arg {
-                    Term::App(_, _, _) | Term::Abs(_, _, _) => write!(f, " ({})", arg),
-                    _ => write!(f, " {}", arg),
-                }
+            Term::Abs { param, body } => {
+                write!(f, "λ {}. {}", param, body)
             }
 
-            Term::Abs(param, _ty, body) => {
-                write!(f, "λ{}. {}", param, body)
+            Term::App { func, arg, .. } => {
+                // f a  (einfach Kopf und Argument, ohne zusätzliche Klammern)
+                write!(f, "{}", func,)?;
+                match &**arg {
+                    Term::App {
+                        func: _,
+                        arg: _,
+                        result_ty: _,
+                    }
+                    | Term::Abs { param: _, body: _ } => write!(f, " ({})", arg),
+                    _ => write!(f, " {}", arg),
+                }
             }
         }
     }
@@ -162,6 +147,6 @@ impl fmt::Display for Term {
 impl fmt::Display for Constraint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Constraint(lhs, rhs) = self;
-        write!(f, "{} = {}", lhs, rhs)
+        write!(f, "{} ?= {}", lhs, rhs)
     }
 }
