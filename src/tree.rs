@@ -151,7 +151,7 @@ where
 pub fn unify_stream(state: &State, config: &Config) -> Box<dyn Iterator<Item = State>> {
     //  Wenn keine Constraints mehr offen sind, liefert einen einzigen State
     if state.constraints.is_empty() {
-        if state.is_solved() && !state.subst.to_hashmap().is_empty() {
+        if state.is_solved() {
             return Box::new(std::iter::once(state.clone()));
         } else {
             return Box::new(std::iter::empty());
@@ -163,16 +163,9 @@ pub fn unify_stream(state: &State, config: &Config) -> Box<dyn Iterator<Item = S
     let head = rest.remove(0);
 
     // Wende alle Unifizierungsregeln an -> Vec<State>
-    let raw_succs = unification::apply_unify_rules(head.clone(), &state, config)
+    let succs: Vec<State> = unification::apply_unify_rules(head.clone(), &state, config)
         .into_iter()
-        .filter(|s| !s.failed);
-
-    let mut seen_cs = std::collections::HashSet::new();
-    let succs: Vec<State> = raw_succs
-        .filter(|s| {
-            let key = s.constraints.clone();
-            seen_cs.insert(key)
-        })
+        .filter(|s| !s.failed)
         .collect();
 
     //  Für jeden Nachfolger rekursiv weiterführen

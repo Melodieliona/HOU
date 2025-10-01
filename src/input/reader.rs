@@ -1,40 +1,15 @@
 use crate::input::input::run_loop;
-use crate::json_utils::{clear_variables, read_json};
+use crate::json_utils::{clear, read_json};
 use crate::parser::parser::parse;
 use crate::term::{Constraint, TermKind, Type, Var, Variable};
 use std::io::{self, Write};
-
-// Lädt Variablen aus der letzten Sitzung oder verwirft sie
-pub fn load_previous_variables() -> io::Result<Vec<Variable>> {
-    println!("\n--- Variablen aus vorheriger Sitzung laden? (y/n) ---");
-    print!("Antwort: ");
-    io::stdout().flush()?;
-
-    let mut answer = String::new();
-    io::stdin().read_line(&mut answer)?;
-    let answer = answer.trim().to_lowercase();
-
-    let mut all_var = Vec::new();
-    if answer == "y" || answer == "ja" {
-        let previous: Vec<Variable> = read_json("variables.json")?;
-        println!("{} Variablen übernommen.", previous.len());
-        all_var.extend(previous);
-    } else if answer == "n" || answer == "nein" {
-        clear_variables("variables.json");
-        println!("Vorherige Variablen verworfen.");
-    } else {
-        println!("Ungültige Eingabe.");
-        load_previous_variables()?;
-    }
-    Ok(all_var)
-}
 
 // Liest genau einen Constraint ein und prüft ihn
 pub fn read_constraints(all_var: &mut Vec<Variable>) -> io::Result<Vec<Constraint>> {
     let mut constraints = Vec::new();
 
     loop {
-        print!("Constraint (Format 'lhs ?= rhs') | stop | return: ");
+        print!("Constraint (Format: lhs ?= rhs) | Stop | Zurück: ");
         io::stdout().flush()?;
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
@@ -43,7 +18,7 @@ pub fn read_constraints(all_var: &mut Vec<Variable>) -> io::Result<Vec<Constrain
         if line.eq_ignore_ascii_case("stop") {
             std::process::exit(0);
         }
-        if line.eq_ignore_ascii_case("return") {
+        if line.eq_ignore_ascii_case("zurück") {
             run_loop(all_var)?;
             break;
         }
@@ -87,7 +62,7 @@ fn read_termkind() -> Result<TermKind, String> {
 
 //Frägt den Nutzer nach dem Typ und parst die Eingabe
 fn read_type() -> Result<Type, String> {
-    print!("Typ (Real, Nat, Bool oder A->B): ");
+    print!("Typ (Real, Nat, Bool, Eigener Typ oder A->B): ");
     io::stdout().flush().map_err(|e| e.to_string())?;
     let mut buf = String::new();
     io::stdin().read_line(&mut buf).map_err(|e| e.to_string())?;
@@ -131,4 +106,83 @@ fn check_constraint(line: &str, all_var: &[Variable]) -> bool {
         }
     }
     true
+}
+
+//Fügt neue Typen hinzu
+pub fn custom_types() -> io::Result<()> {
+    use serde_json;
+    use std::{fs, io};
+
+    let raw = fs::read_to_string("types.json")?;
+    let mut types: Vec<String> = serde_json::from_str(&raw).unwrap_or_default();
+
+    println!("Gib die Typen ein (einer pro Zeile, leer zum Beenden):");
+    loop {
+        let mut line = String::new();
+        io::stdin().read_line(&mut line)?;
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+        if !types.contains(&trimmed.to_string()) {
+            types.push(trimmed.to_string());
+        }
+    }
+
+    let file = fs::File::create("types.json")?;
+    serde_json::to_writer_pretty(file, &types)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    println!("Typen wurden gespeichert: {:?}", types);
+    Ok(())
+}
+
+//Lädt oder verwirft Variablen und Typen aus der vorherigen SItzung
+pub fn load_previous_session() -> io::Result<Vec<Variable>> {
+    let mut allow_variables = true;
+    let mut _types: Vec<String> = if prompt("--- Typen aus vorheriger Sitzung laden?")? {
+        read_json("types.json").unwrap_or_else(|e| {
+            eprintln!("Fehler beim Lesen types.json: {}", e);
+            Vec::new()
+        })
+    } else {
+        clear("types.json");
+        allow_variables = false;
+        Vec::new()
+    };
+
+    if prompt("Möchtest du eigene Typen hinzufügen?")? {
+        crate::input::reader::custom_types()?;
+        _types = read_json("types.json").unwrap_or_default();
+    }
+
+    let vars = if allow_variables && prompt("--- Variablen aus vorheriger Sitzung laden?")? {
+        let previous_var = read_json::<Vec<Variable>>("variables.json").unwrap_or_else(|e| {
+            eprintln!("Fehler beim Lesen variables.json: {}", e);
+            Vec::new()
+        });
+        println!("{} Variablen übernommen.", previous_var.len());
+        previous_var
+    } else {
+        clear("variables.json");
+        println!("Vorherige Variablen verworfen");
+        Vec::new()
+    };
+
+    Ok(vars)
+}
+
+//Antwortmöglichkeiten für load previous session
+pub fn prompt(msg: &str) -> io::Result<bool> {
+    loop {
+        print!("{} (j/n): ", msg);
+        io::stdout().flush()?;
+        let mut ans = String::new();
+        io::stdin().read_line(&mut ans)?;
+        match ans.trim().to_lowercase().as_str() {
+            "j" | "ja" => return Ok(true),
+            "n" | "nein" => return Ok(false),
+            _ => println!("Ungültige Eingabe."),
+        }
+    }
 }

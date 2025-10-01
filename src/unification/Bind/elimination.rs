@@ -15,7 +15,6 @@ pub fn apply_elimination(
     config: &Config,
     constraint: &Constraint,
 ) -> Vec<State> {
-    println!("Elimination");
     // Kopf und Argumente in HNF extrahieren
     let (_bs_l, head_l, _args_l) = flatten_hnf(&term);
     let (f_name, f_ty) = match head_l.get_fvar() {
@@ -78,7 +77,7 @@ fn combinations(indices: &[usize], k: usize) -> Vec<Vec<usize>> {
     ergebnis
 }
 
-// Baut λx1...xn. G x_{j1}…x_{ji}, inkl. frischer G-Variable
+// Baut λx1...xn. G x_{j1}...x_{ji}, inkl. frischer G-Variable
 fn build_lambda(term: &Term, f_name: &str, alphas: &[Type], beta: &Type, seq: &[usize]) -> Term {
     let mut r#gen = init_fresh_gen(std::iter::once(term));
     // frischen Namen und Typ für G anlegen
@@ -95,13 +94,19 @@ fn build_lambda(term: &Term, f_name: &str, alphas: &[Type], beta: &Type, seq: &[
         var: Var::Elimination,
     });
 
-    // Körper G x_{j1}…x_{ji}
+    // Körper G x_{j1}...x_{ji}
     let xs = build_bound_vars(alphas, "x");
-    let body = seq.iter().fold(g_head, |acc, &i| Term::App {
-        func: Box::new(acc),
-        arg: Box::new(Term::Var(xs[i].clone())),
-        result_ty: g_ty.clone(),
-    });
+    let mut acc = g_head;
+    for &i in seq {
+        if i < xs.len() - 1 {
+            acc = Term::App {
+                func: Box::new(acc),
+                arg: Box::new(Term::Var(xs[i].clone())),
+                result_ty: g_ty.clone(),
+            };
+        }
+    }
+    let body = acc;
 
     // λx1..xn body
     xs.into_iter().rev().fold(body, |acc, x| Term::Abs {

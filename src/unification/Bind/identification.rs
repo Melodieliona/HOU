@@ -4,7 +4,6 @@ use crate::tree::*;
 use crate::unification::unification_utils::*;
 use Type::Arrow;
 pub fn apply_identification(constraint: &Constraint, state: &State, config: &Config) -> Vec<State> {
-    print!("apply_id");
     let Constraint(lhs, rhs) = &constraint;
     let mut r#gen = init_fresh_gen(vec![lhs, rhs]);
 
@@ -61,7 +60,6 @@ pub fn build_fi_terms(
         .iter()
         .enumerate()
         .map(|(_i, gamma_ty)| {
-            // Fi : α₁→…→αₙ→γᵢ
             let fi_ty = alphas_f.iter().rev().fold(gamma_ty.clone(), |acc, a| {
                 Arrow(Box::new(a.clone()), Box::new(acc))
             });

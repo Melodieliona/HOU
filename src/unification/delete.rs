@@ -3,7 +3,6 @@ use crate::tree::State;
 
 // Prüft, ob das Constraint trivial ist (s ?= s).
 pub fn is_deletable(lhs: &Term, rhs: &Term) -> bool {
-    println!("Delete?");
     lhs == rhs
 }
 

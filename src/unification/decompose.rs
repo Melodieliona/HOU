@@ -2,8 +2,8 @@ use crate::term::{Constraint, Term};
 use crate::tree::State;
 use crate::unification::unification_utils::*;
 
+//True, falls selbe Binder, Köpfe und Länge
 pub fn is_decomposable(lhs: &Term, rhs: &Term) -> bool {
-    println!("Decompose?");
     let (b1, h1, a1) = flatten_hnf(lhs);
     let (b2, h2, a2) = flatten_hnf(rhs);
 
@@ -12,7 +12,6 @@ pub fn is_decomposable(lhs: &Term, rhs: &Term) -> bool {
 
 // Erzeugt Constraints
 pub fn apply_decompose(constraint: Constraint, state: &State) -> Vec<State> {
-    println!("Decompose: {}", constraint);
     let subst = &state.subst.clone();
     let Constraint(lhs, rhs) = constraint;
     let (_b, _h, args_l) = flatten_hnf(&lhs);

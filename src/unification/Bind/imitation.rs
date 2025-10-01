@@ -12,7 +12,6 @@ pub fn is_imitationable(head_s: &Term, head_t: &Term) -> bool {
 }
 
 pub fn apply_imitation(constraint: &Constraint, state: &State, config: &Config) -> Vec<State> {
-    println!("apply imitation");
     let Constraint(lhs, rhs) = constraint;
     let mut r#gen = init_fresh_gen(vec![lhs, rhs]);
 
@@ -89,10 +88,11 @@ fn build_fi_apps(
     r#gen: &mut FreshNameGen,
 ) -> Vec<Term> {
     let mut apps = Vec::new();
+    let base = f_name.trim_end_matches(|c: char| c.is_ascii_digit());
 
     for i in 0..term_g.len() {
         let mut term = Term::Var(Variable {
-            name: r#gen.fresh(f_name),
+            name: r#gen.fresh(base),
             term_kind: TermKind::FVar,
             ty: {
                 let fi_ty = term_f.iter().rev().fold(term_g[i].clone(), |acc, a| {

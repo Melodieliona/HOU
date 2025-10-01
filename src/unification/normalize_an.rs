@@ -16,7 +16,6 @@ pub fn is_normalizable_an(lhs: &Term, rhs: &Term) -> bool {
 
 // Wendet die an-Normierung an:
 pub fn apply_normalize_an(constraint: Constraint, state: &State) -> Vec<State> {
-    println!("Normalisiere an");
     let subst = &state.subst.clone();
     let Constraint(lhs, rhs) = constraint;
 

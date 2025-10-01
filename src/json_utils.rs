@@ -5,7 +5,7 @@ use std::io::*;
 use crate::term::Variable;
 
 //Löscht alle bisherigen Variablen in der JSON Datei
-pub fn clear_variables(path: &str) {
+pub fn clear(path: &str) {
     let file = match OpenOptions::new()
         .write(true)
         .create(true)

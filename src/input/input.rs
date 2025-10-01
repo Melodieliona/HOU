@@ -35,7 +35,7 @@ fn handle_next(all_var: &mut Vec<Variable>) -> io::Result<()> {
     println!("Eingestellte Config: {:?}\n", config);
 
     let stream = unify_stream(&initial, &config);
-    print_solutions(stream);
+    let _ = print_solutions(stream);
     Ok(())
 }
 

@@ -30,6 +30,7 @@ pub enum Type {
     Nat,
     Bool,
     Arrow(Box<Type>, Box<Type>),
+    Custom(String),
 }
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum Term {
@@ -108,6 +109,7 @@ impl fmt::Display for Type {
             Type::Nat => write!(f, "Nat"),
             Type::Bool => write!(f, "Bool"),
             Type::Arrow(a, b) => write!(f, "{}->{}", a, b),
+            Type::Custom(a) => write!(f, "{}", a),
         }
     }
 }

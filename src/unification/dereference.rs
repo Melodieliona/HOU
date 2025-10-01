@@ -7,7 +7,6 @@ use crate::unification::unification_utils::wrap_with_abstractions;
 //Dereference ({
 // λx.F s ? = λx.t}⊎E,σ) −→ ({λx.(σF)s ? = λx.t}⊎E,σ)
 pub fn is_dereference(lhs: &Term, rhs: &Term, state: &State) -> bool {
-    println!("Dereference?");
     let subst = &state.subst.clone();
     let (binders_l, head_l, _core_l) = flatten_hnf(lhs);
     let (binders_r, head_r, _core_r) = flatten_hnf(rhs);
@@ -19,7 +18,6 @@ pub fn is_dereference(lhs: &Term, rhs: &Term, state: &State) -> bool {
     match (head_l, head_r) {
         (Term::Var(var), _) | (_, Term::Var(var)) if var.term_kind == TermKind::FVar => {
             let bound = subst.to_hashmap().contains_key(&var.name);
-            println!("is_dereference -> {}", bound);
             bound
         }
         _ => false,
@@ -28,7 +26,6 @@ pub fn is_dereference(lhs: &Term, rhs: &Term, state: &State) -> bool {
 
 //Wendet Dereference an:
 pub fn apply_dereference(constraint: Constraint, state: &State) -> Vec<State> {
-    println!("Dereference: {}", constraint);
     let subst = &state.subst.clone();
     let Constraint(lhs, rhs) = constraint;
     let (_binders_l, _head_l, _core_l) = flatten_hnf(&lhs);
@@ -73,6 +70,5 @@ fn dereference(lhs: &Term, subst: &PersistentSubst) -> Term {
         let result = wrap_with_abstractions(&result.clone(), &binders.clone());
         return result;
     }
-    println!("DereferenceEnd: {}", result);
     result
 }

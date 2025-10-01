@@ -28,6 +28,7 @@ impl FreshNameGen {
     }
 }
 
+//Initialisiert einen neuen Variablennamen, mithilfe der bereits verwendeten
 pub fn init_fresh_gen<'a, I>(terms: I) -> FreshNameGen
 where
     I: IntoIterator<Item = &'a Term>,
@@ -56,15 +57,12 @@ pub fn collect_names(term: &Term, set: &mut HashSet<String>) {
     }
 }
 
-//Ist keine Identifikationsvariable, falls nicht ins SUbst enthalten und FVar
+//Ist keine Identifikationsvariable, falls nicht ins Subst enthalten und FVar
 pub fn is_non_identification_var(term: &Term, subst: &PersistentSubst) -> bool {
     if let Term::Var(var) = term {
-        // 1. Ist es überhaupt eine F-Variable?
         if var.term_kind == TermKind::FVar {
-            // 2. Und wurde sie schon gebunden?
             let bound = subst.to_hashmap();
             let still_free = !bound.contains_key(&var.name);
-            // 3. Aber niemals eine Ident-Variable
             return still_free && var.var != Var::Identification;
         }
     }
@@ -76,6 +74,7 @@ pub fn is_elimination_variable(head: &Term) -> bool {
     head.get_var().unwrap().var == Var::Elimination
 }
 
+//Überprüft, ob die Variable eine FVar ist
 pub fn is_flex(t: &Term) -> bool {
     matches!(t, Term::Var(var) if var.term_kind == TermKind::FVar)
 }
@@ -146,6 +145,7 @@ pub fn flatten_hnf(term: &Term) -> (Vec<Variable>, Term, Vec<Term>) {
     (binders, head, args)
 }
 
+//Wandelt Argumente in einen Term um
 pub fn apply_with<A, F>(mut term: Term, args: &[A], to_term: F) -> Term
 where
     F: Fn(&A) -> Term,
@@ -167,6 +167,7 @@ where
     term
 }
 
+// Extrahiert Lambda Binder aus einem Term
 pub fn get_abs(term: &Term) -> (Vec<&Variable>, &Term) {
     let mut binders = Vec::new();
     let mut term = term;

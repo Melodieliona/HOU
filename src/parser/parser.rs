@@ -3,6 +3,7 @@ use crate::parser::tokenize::{Token, tokenize};
 use crate::term::{Constraint, Term, TermKind, Type, Variable};
 use core::fmt;
 use std::error::Error;
+use std::fs;
 use std::str::FromStr;
 
 // Liest JSON, tokenisiert und parst zum Constraint
@@ -281,7 +282,15 @@ impl FromStr for Type {
             "real" => Ok(Type::Real),
             "nat" => Ok(Type::Nat),
             "bool" => Ok(Type::Bool),
-            other => Err(format!("Unbekannter Typ: {}", other)),
+            _ => {
+                let raw = fs::read_to_string("types.json").map_err(|e| e.to_string())?;
+                let json: Vec<String> = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+                if json.iter().any(|t| t == s) {
+                    Ok(Type::Custom(s.to_string()))
+                } else {
+                    Err(format!("Unbekannter Typ: {}", s))
+                }
+            }
         }
     }
 }

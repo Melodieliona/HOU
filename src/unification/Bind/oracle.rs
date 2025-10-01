@@ -3,7 +3,7 @@ use crate::term::*;
 use crate::tree::State;
 use crate::unification::unification_utils::{flatten_hnf, init_fresh_gen, wrap_with_abstractions};
 
-/// Prüft, ob mindestens ein Binding-Limit erreicht ist
+// Prüft, ob mindestens ein Binding-Limit erreicht ist
 fn at_limit(counts: &crate::counter::BindingCounts, cfg: &Config) -> bool {
     counts.simple_proj >= cfg.max_simple_proj
         || counts.functional_proj >= cfg.max_functional_proj
@@ -25,7 +25,7 @@ pub fn oracle(Constraint(lhs, rhs): &Constraint, state: &State, cfg: &Config) ->
     let is_flex_l = matches!(head_l.get_termkind(), TermKind::FVar);
     let is_flex_r = matches!(head_r.get_termkind(), TermKind::FVar);
 
-    //Flex–Flex → trivialen Unifier bauen
+    //Bei Flex–Flex trivialen Unifier bauen
     if is_flex_l && is_flex_r {
         let (f_name, f_ty) = head_l.get_fvar().unwrap();
         let (g_name, _g_ty) = head_r.get_fvar().unwrap();
@@ -68,7 +68,7 @@ pub fn oracle(Constraint(lhs, rhs): &Constraint, state: &State, cfg: &Config) ->
         return Some(state.with_subst_and_count(vec![], sub2));
     }
 
-    // Flex–Rigid → direkt fail
+    // Bei FLex Rigid fail
     if (is_flex_l && !is_flex_r) || (!is_flex_l && is_flex_r) {
         return Some(State::fail());
     }

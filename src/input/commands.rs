@@ -16,12 +16,17 @@ impl FromStr for Command {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         let lower = input.trim();
-        if lower.eq_ignore_ascii_case("next") {
-            Ok(Command::Next)
+        if lower.eq_ignore_ascii_case("weiter") {
+            return Ok(Command::Next);
         } else if lower.eq_ignore_ascii_case("stop") {
-            Ok(Command::Stop)
-        } else if let Some(rest) = lower.strip_prefix("delete ") {
-            Ok(Command::Delete(rest.trim().into()))
+            return Ok(Command::Stop);
+        }
+        let mut parts = lower.splitn(2, ' ');
+        let command_part = parts.next().unwrap_or("");
+        let argument_part = parts.next().unwrap_or("").trim();
+
+        if command_part.eq_ignore_ascii_case("lösche") && !argument_part.is_empty() {
+            Ok(Command::Delete(argument_part.into()))
         } else if !lower.is_empty() {
             Ok(Command::New(lower.into()))
         } else {
@@ -32,7 +37,7 @@ impl FromStr for Command {
 
 // Liest eine Zeile von stdin und wandelt sie in ein Command um
 pub fn read_command() -> io::Result<Command> {
-    print!("Eingabe (Name | Delete <Name> | Next | Stop): ");
+    print!("Eingabe (Name | Lösche <Name> | Weiter | Stop): ");
     io::stdout().flush()?;
     let mut buf = String::new();
     io::stdin().read_line(&mut buf)?;

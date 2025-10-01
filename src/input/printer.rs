@@ -1,22 +1,30 @@
 use crate::tree::State;
 use std::collections::HashSet;
+use std::fs::File;
+use std::io::{BufWriter, Result, Write};
 use std::rc::Rc;
 
-/// Druckt alle Lösungen in umgekehrter Schrittfolge
-pub fn print_solutions(stream: impl Iterator<Item = State>) {
+// Druckt alle Lösungen in umgekehrter Schrittfolge
+pub fn print_solutions(stream: impl Iterator<Item = State>) -> Result<()> {
     let mut seen = HashSet::new();
-    // 1) Fertige, eindeutige Lösungen sammeln
+    let mut out = BufWriter::new(File::create("solutions")?);
+    // Fertige, eindeutige Lösungen sammeln
     let solutions: Vec<State> = stream
         .filter(|st| st.constraints.is_empty() && !st.failed) // nur Blätter
         .filter_map(|sol| {
-            // kanonische Repräsentation ohne trailing newlines
             let repr = format!("{}", sol.subst).trim_end().to_string();
-            // nur die erste Instanz jeder Repr. behalten
             if seen.insert(repr) { Some(sol) } else { None }
         })
         .collect();
+
+    if solutions.is_empty() {
+        println!("Es konnten keine Lösungen gefunden werden");
+        writeln!(out, "Es konnten keine Lösungen gefunden werden")?;
+    }
+
     for (i, sol) in solutions.iter().enumerate() {
         println!("Lösung #{}:\n{}", i + 1, sol.subst);
+        writeln!(out, "Lösung #{}:\n{}", i + 1, sol.subst)?;
 
         // Alle States einsammeln
         let mut stack: Vec<Rc<State>> = Vec::new();
@@ -33,16 +41,22 @@ pub fn print_solutions(stream: impl Iterator<Item = State>) {
         // Schritte rückwärts ausgeben
         for (step, state_rc) in stack.into_iter().rev().enumerate() {
             println!("Schritt {}:", step);
+            writeln!(out, "Schritt {}:", step)?;
             if state_rc.constraints.is_empty() {
-                println!("  (alle Constraints gelöst)");
+                println!("  Alle Constraints gelöst");
+                writeln!(out, "  Alle Constraints gelöst")?;
             } else {
                 for c in &state_rc.constraints {
                     println!("  • {}", c);
+                    writeln!(out, "  • {}", c)?;
                 }
             }
             for line in format!("{}", state_rc.subst).lines() {
                 println!("    {}", line);
+                writeln!(out, "    {}", line)?;
             }
+            writeln!(out)?;
         }
     }
+    Ok(())
 }

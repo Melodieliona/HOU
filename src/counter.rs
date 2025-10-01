@@ -1,3 +1,4 @@
+use crate::input::reader::prompt;
 use crate::term::*;
 use crate::tree::{PersistentSubst, State};
 use crate::unification::bind::oracle::oracle;
@@ -40,12 +41,12 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            max_simple_proj: 10,
-            max_functional_proj: 10,
-            max_eliminations: 10,
-            max_imitations: 10,
-            max_identifications: 10,
-            max_total: 40,
+            max_simple_proj: 4,
+            max_functional_proj: 4,
+            max_eliminations: 4,
+            max_imitations: 4,
+            max_identifications: 4,
+            max_total: 10,
         }
     }
 }
@@ -139,21 +140,13 @@ pub fn read_limit(prompt: &str, default: usize) -> io::Result<usize> {
 
 // Frägt den Nutzer nach individuellen oder Standard-Grenzen für Bindungen
 pub fn read_config() -> io::Result<Config> {
-    println!("\n--- Möchtest du die Standardwerte für die Bindungsgrenzen verwenden? (y/n) ---");
-    print!("Antwort: ");
-    io::stdout().flush()?;
-
-    let mut answer = String::new();
-    io::stdin().read_line(&mut answer)?;
-    let answer = answer.trim().to_lowercase();
-
-    if answer == "y" || answer == "ja" {
+    if prompt("\n--- Möchtest du die Standardwerte für die Bindungsgrenzen verwenden?")? {
         let cfg = Config::default();
         println!("→ Standardwerte übernommen: {:?}", cfg);
         return Ok(cfg);
     }
 
-    println!("→ Bitte individuelle Grenzen eingeben:");
+    println!("→ Bitte individuelle Grenzen eingeben oder leer lassen für Standardwert:");
 
     let default = Config::default();
     let max_simple_proj = read_limit("Max einfache Projektionen", default.max_simple_proj)?;

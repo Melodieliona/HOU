@@ -16,9 +16,8 @@ pub fn is_normalizable_beta(lhs: &Term, rhs: &Term) -> bool {
 // Wendet β-Normierung auf den Rumpf an: λx.s ? λx.t → λx.s↓h ? λx.t↓h
 pub fn apply_normalize_beta(constraint: Constraint, state: &State) -> Vec<State> {
     let subst = &state.subst;
-
-    println!("Normalite_beta");
     let Constraint(lhs, rhs) = constraint;
+
     //AppLhs
     if let Term::App { func, arg, .. } = lhs.clone() {
         if let Term::Abs { param, body } = *func {
@@ -57,7 +56,7 @@ pub fn apply_normalize_beta(constraint: Constraint, state: &State) -> Vec<State>
     vec![]
 }
 
-// Ist der Term bereits in Head-Normalform?
+// Ist der Term bereits in Head-Normalform
 fn is_hnf(term: &Term) -> bool {
     match term {
         Term::Abs { .. } => true,
@@ -66,7 +65,7 @@ fn is_hnf(term: &Term) -> bool {
     }
 }
 
-// Reduziert links β Redexe bis zur HNF
+// Reduziert links ß Redexe bis zur HNF
 fn head_normalize(mut t: Term) -> Term {
     loop {
         if let Term::App { func, arg, .. } = t.clone() {
