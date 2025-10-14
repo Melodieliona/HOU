@@ -6,12 +6,14 @@ use Type::Arrow;
 
 //Testet, ob Imitation eingesetzt werden kann
 pub fn is_imitationable(head_s: &Term, head_t: &Term) -> bool {
+    println!("imitation?");
     let (_term_f, beta_f) = Type::split_arrow(&head_s.get_type());
     let (_term_g, beta_g) = Type::split_arrow(&head_t.get_type());
     beta_f == beta_g
 }
 
 pub fn apply_imitation(constraint: &Constraint, state: &State, config: &Config) -> Vec<State> {
+    println!("imitation yes");
     let Constraint(lhs, rhs) = constraint;
     let mut r#gen = init_fresh_gen(vec![lhs, rhs]);
 
@@ -44,14 +46,15 @@ pub fn apply_imitation(constraint: &Constraint, state: &State, config: &Config) 
 
     // neue Substitution und neuer State
     let new_subst = state.subst.clone().push(f_name.clone(), lam);
-    let new_state = try_binding(
-        state,
+    let new_state = state.try_binding(
         BindingKind::Imitation,
         1,
         constraint,
         new_subst.clone(),
         config,
+        Step::Imitation,
     );
+    println!("{:?}", new_state.constraints);
     vec![new_state]
 }
 // Falls linker Kopf konstant ist, tausche die Seiten damit linker Kopf flexibel wird
@@ -131,7 +134,6 @@ fn make_const_term(name: &str, ty: &Type) -> Term {
 
 // Wendet die Liste von Argument-Terms nacheinander auf den Kopf an
 fn apply_args_to_head(mut head: Term, args: Vec<Term>) -> Term {
-    println!("body = {}", head);
     for arg in args {
         if let Type::Arrow(dom, cod) = head.get_type() {
             assert_eq!(*dom, arg.get_type());

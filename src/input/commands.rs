@@ -18,7 +18,7 @@ impl FromStr for Command {
         let lower = input.trim();
         if lower.eq_ignore_ascii_case("weiter") {
             return Ok(Command::Next);
-        } else if lower.eq_ignore_ascii_case("stop") {
+        } else if lower.eq_ignore_ascii_case("stopp") {
             return Ok(Command::Stop);
         }
         let mut parts = lower.splitn(2, ' ');
@@ -37,7 +37,7 @@ impl FromStr for Command {
 
 // Liest eine Zeile von stdin und wandelt sie in ein Command um
 pub fn read_command() -> io::Result<Command> {
-    print!("Eingabe (Name | Lösche <Name> | Weiter | Stop): ");
+    print!("Eingabe (Name | Lösche <Name> | Weiter | Stopp): ");
     io::stdout().flush()?;
     let mut buf = String::new();
     io::stdin().read_line(&mut buf)?;

@@ -34,7 +34,6 @@ pub enum Type {
 }
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum Term {
-    #[allow(dead_code)]
     Var(Variable),
     Abs {
         param: Variable,
@@ -89,12 +88,12 @@ impl Term {
     }
 }
 impl Type {
-    //zählt arrows
+    //Gibt Eingabetypen und Ausgabetyp zurück
     pub fn split_arrow(&self) -> (Vec<Type>, Type) {
         let mut tys_in = Vec::new();
         let mut rest = self.clone();
         while let Type::Arrow(ty_in, ty_out) = rest {
-            tys_in.push((*ty_in).clone());
+            tys_in.push(*ty_in);
             rest = *ty_out;
         }
         (tys_in, rest)
@@ -108,7 +107,13 @@ impl fmt::Display for Type {
             Type::Real => write!(f, "Real"),
             Type::Nat => write!(f, "Nat"),
             Type::Bool => write!(f, "Bool"),
-            Type::Arrow(a, b) => write!(f, "{}->{}", a, b),
+            Type::Arrow(a, b) => {
+                if let Type::Arrow(_, _) = **a {
+                    write!(f, "({})->{}", a, b)
+                } else {
+                    write!(f, "{}->{}", a, b)
+                }
+            }
             Type::Custom(a) => write!(f, "{}", a),
         }
     }
@@ -126,19 +131,16 @@ impl fmt::Display for Term {
             Term::Var(var) => write!(f, "{}", var),
 
             Term::Abs { param, body } => {
-                write!(f, "λ {}. {}", param, body)
+                write!(f, "λ{}. {}", param, body)
             }
 
             Term::App { func, arg, .. } => {
-                // f a  (einfach Kopf und Argument, ohne zusätzliche Klammern)
-                write!(f, "{}", func,)?;
+                let _ = match &**func {
+                    Term::Abs { .. } => write!(f, "({})", func),
+                    _ => write!(f, "{}", func),
+                };
                 match &**arg {
-                    Term::App {
-                        func: _,
-                        arg: _,
-                        result_ty: _,
-                    }
-                    | Term::Abs { param: _, body: _ } => write!(f, " ({})", arg),
+                    Term::App { .. } | Term::Abs { .. } => write!(f, " ({})", arg),
                     _ => write!(f, " {}", arg),
                 }
             }

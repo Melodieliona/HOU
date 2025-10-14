@@ -1,6 +1,6 @@
 use crate::counter::*;
 use crate::term::*;
-use crate::tree::State;
+use crate::tree::{State, Step};
 use crate::unification::unification_utils::{flatten_hnf, init_fresh_gen, wrap_with_abstractions};
 
 // Prüft, ob mindestens ein Binding-Limit erreicht ist
@@ -65,7 +65,7 @@ pub fn oracle(Constraint(lhs, rhs): &Constraint, state: &State, cfg: &Config) ->
             .push(f_name.clone(), lam_f)
             .push(g_name.clone(), lam_g);
 
-        return Some(state.with_subst_and_count(vec![], sub2));
+        return Some(state.with_subst_and_count(vec![], sub2, Step::Oracle));
     }
 
     // Bei FLex Rigid fail

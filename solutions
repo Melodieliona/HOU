@@ -1,0 +1,106 @@
+Lösung #1:
+F ↦ λx1. H2 x1
+G ↦ H2 G1
+G1 ↦ a
+
+Schritt 0 (Start):
+  • F a ?= G
+  Neue Variable: G (Kind: FVar, Typ: Nat, Modus: Basic)
+  Neue Variable: F (Kind: FVar, Typ: Bool->Nat, Modus: Basic)
+  Neue Variable: a (Kind: Const, Typ: Bool, Modus: Basic)
+
+Schritt 1 (Identification):
+  • F a ?= G
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+  Neue Variable: G1 (Kind: FVar, Typ: Bool, Modus: Basic)
+  Neue Variable: x1 (Kind: BVar, Typ: Bool, Modus: Basic)
+  Neue Variable: H2 (Kind: FVar, Typ: Bool->Nat, Modus: Identification)
+
+Schritt 2 (Dereference):
+  • (λx1. H2 x1) a ?= H2 G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+
+Schritt 3 (NormalizeBeta):
+  • H2 a ?= H2 G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+
+Schritt 4 (Decompose):
+  • a ?= G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+
+Schritt 5 (Imitation):
+  • a ?= G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    G1 ↦ a
+
+Schritt 6 (Dereference):
+  • a ?= a
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    G1 ↦ a
+
+Schritt 7 (Delete):
+  Alle Constraints gelöst
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    G1 ↦ a
+
+Lösung #2:
+F ↦ λx1. H2 x1
+G ↦ H2 G1
+H2 ↦ λx1. H1
+
+Schritt 0 (Start):
+  • F a ?= G
+
+Schritt 1 (Identification):
+  • F a ?= G
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+
+Schritt 2 (Dereference):
+  • (λx1. H2 x1) a ?= H2 G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+
+Schritt 3 (NormalizeBeta):
+  • H2 a ?= H2 G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+
+Schritt 4 (Elimination):
+  • H2 a ?= H2 G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    H2 ↦ λx1. H1
+  Neue Variable: H1 (Kind: FVar, Typ: Bool->Nat, Modus: Elimination)
+
+Schritt 5 (Dereference):
+  • (λx1. H1) a ?= (λx1. H1) G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    H2 ↦ λx1. H1
+
+Schritt 6 (NormalizeBeta):
+  • H1 ?= (λx1. H1) G1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    H2 ↦ λx1. H1
+
+Schritt 7 (NormalizeBeta):
+  • H1 ?= H1
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    H2 ↦ λx1. H1
+
+Schritt 8 (Delete):
+  Alle Constraints gelöst
+    F ↦ λx1. H2 x1
+    G ↦ H2 G1
+    H2 ↦ λx1. H1
+

@@ -61,7 +61,8 @@ pub fn apply_hs_projection(
             BindingKind::FunctionalProjection
         };
 
-        let new_state = try_binding(state, kind, 1, constraint, new_subst, config);
+        let new_state =
+            state.try_binding(kind, 1, constraint, new_subst, config, Step::HsProjection);
         results.push(new_state);
     }
     results

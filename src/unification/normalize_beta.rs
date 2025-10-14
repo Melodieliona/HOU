@@ -1,5 +1,5 @@
 use crate::term::*;
-use crate::tree::State;
+use crate::tree::{State, Step};
 use crate::unification::unification_utils::*;
 
 // Prüft, ob beide Seiten eine λ-Abstraktion mit demselben Binder x haben
@@ -22,8 +22,11 @@ pub fn apply_normalize_beta(constraint: Constraint, state: &State) -> Vec<State>
     if let Term::App { func, arg, .. } = lhs.clone() {
         if let Term::Abs { param, body } = *func {
             let reduced = substitute(&*body, &param, &*arg);
-            let st =
-                state.with_subst_and_count(vec![Constraint(reduced, rhs.clone())], subst.clone());
+            let st = state.with_subst_and_count(
+                vec![Constraint(reduced, rhs.clone())],
+                subst.clone(),
+                Step::NormalizeBeta,
+            );
             return vec![st];
         }
     }
@@ -31,8 +34,11 @@ pub fn apply_normalize_beta(constraint: Constraint, state: &State) -> Vec<State>
     if let Term::App { func, arg, .. } = rhs.clone() {
         if let Term::Abs { param, body } = *func {
             let reduced = substitute(&*body, &param, &*arg);
-            let st =
-                state.with_subst_and_count(vec![Constraint(lhs.clone(), reduced)], subst.clone());
+            let st = state.with_subst_and_count(
+                vec![Constraint(lhs.clone(), reduced)],
+                subst.clone(),
+                Step::NormalizeBeta,
+            );
             return vec![st];
         }
     }
@@ -50,8 +56,12 @@ pub fn apply_normalize_beta(constraint: Constraint, state: &State) -> Vec<State>
             param: param.clone(),
             body: Box::new(t_hnf),
         };
-        let new_constr = Constraint(new_l, new_r);
-        return vec![state.with_subst_and_count(vec![new_constr], subst.clone())];
+        let new_const = Constraint(new_l, new_r);
+        return vec![state.with_subst_and_count(
+            vec![new_const],
+            subst.clone(),
+            Step::NormalizeBeta,
+        )];
     }
     vec![]
 }

@@ -9,13 +9,13 @@ pub fn read_constraints(all_var: &mut Vec<Variable>) -> io::Result<Vec<Constrain
     let mut constraints = Vec::new();
 
     loop {
-        print!("Constraint (Format: lhs ?= rhs) | Stop | Zurück: ");
+        print!("Constraint (Format: lhs ?= rhs) | Stopp | Zurück: ");
         io::stdout().flush()?;
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
         let line = buf.trim();
 
-        if line.eq_ignore_ascii_case("stop") {
+        if line.eq_ignore_ascii_case("stopp") {
             std::process::exit(0);
         }
         if line.eq_ignore_ascii_case("zurück") {

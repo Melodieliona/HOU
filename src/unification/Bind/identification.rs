@@ -3,6 +3,7 @@ use crate::term::*;
 use crate::tree::*;
 use crate::unification::unification_utils::*;
 use Type::Arrow;
+
 pub fn apply_identification(constraint: &Constraint, state: &State, config: &Config) -> Vec<State> {
     let Constraint(lhs, rhs) = &constraint;
     let mut r#gen = init_fresh_gen(vec![lhs, rhs]);
@@ -11,7 +12,7 @@ pub fn apply_identification(constraint: &Constraint, state: &State, config: &Con
     let (_bs_t, head_t, _args_t) = flatten_hnf(&rhs);
     let (f_name, f_ty) = head_s.get_fvar().unwrap();
     let (g_name, g_ty) = head_t.get_fvar().unwrap();
-    //Typen zerlegen in Parameter + Ergebnis
+    //Typen zerlegen in Eingabe + Ausgabe
     let (alphas_f, beta_f) = f_ty.split_arrow();
     let (alphas_g, beta_g) = g_ty.split_arrow();
     //Selber Ergebnistyp
@@ -37,13 +38,13 @@ pub fn apply_identification(constraint: &Constraint, state: &State, config: &Con
         .push(f_name.clone(), f_lam)
         .push(g_name.clone(), g_lam);
 
-    let new_state = try_binding(
-        state,
+    let new_state = state.try_binding(
         BindingKind::Identification,
         1,
         constraint,
         new_subst,
         config,
+        Step::Identification,
     );
 
     vec![new_state]

@@ -1,5 +1,6 @@
 use crate::counter::*;
 use crate::term::*;
+use crate::unification::bind::oracle::*;
 use crate::unification::*;
 use std::collections::*;
 use std::fmt;
@@ -24,11 +25,11 @@ impl PersistentSubst {
     pub fn new() -> Self {
         PersistentSubst(None)
     }
-    // Sucht zuletzt gepushte Bindung für var oder gibt None zurück
-    pub fn lookup(&self, var: &str) -> Option<Term> {
+    // Überprüft, ob die Variable in den bisherigen Substitutionen enthalten ist
+    pub fn lookup(&self, var: &String) -> Option<Term> {
         let mut cur = self.0.clone();
         while let Some(entry) = cur {
-            if entry.var == var {
+            if entry.var == *var {
                 return Some(entry.val.clone());
             }
             cur = entry.prev.clone();
@@ -70,6 +71,22 @@ pub struct State {
     pub failed: bool,
     pub binding_counts: BindingCounts,
     pub parent: Option<Rc<State>>,
+    pub step: Step,
+}
+#[derive(Clone, Debug)]
+pub enum Step {
+    Delete,
+    Dereference,
+    Decompose,
+    NormalizeBeta,
+    NormalizeAn,
+    Fail,
+    Start,
+    Oracle,
+    Identification,
+    Imitation,
+    HsProjection,
+    Elimination,
 }
 
 impl State {
@@ -81,6 +98,7 @@ impl State {
             failed: false,
             binding_counts: BindingCounts::new(),
             parent: None,
+            step: Step::Start,
         }
     }
 
@@ -89,6 +107,7 @@ impl State {
         &self,
         constraints: Vec<Constraint>,
         subst: PersistentSubst,
+        step: Step,
     ) -> Self {
         State {
             constraints,
@@ -96,6 +115,7 @@ impl State {
             failed: false,
             binding_counts: self.binding_counts.clone(),
             parent: Some(Rc::new(self.clone())),
+            step,
         }
     }
 
@@ -107,12 +127,35 @@ impl State {
             failed: true,
             binding_counts: BindingCounts::new(),
             parent: None,
+            step: Step::Fail,
         }
     }
 
     // Prüft, ob alle Constraints gelöst und kein Fail-State vorhanden ist
     fn is_solved(&self) -> bool {
         self.constraints.is_empty() && !self.failed
+    }
+
+    // Versucht eine Bindung anzuwenden oder liefert einen fehlgeschlagenen State
+    pub fn try_binding(
+        &self,
+        kind: BindingKind,
+        count: usize,
+        constraint: &Constraint,
+        new_subst: PersistentSubst,
+        config: &Config,
+        step: Step,
+    ) -> State {
+        if self.binding_counts.would_exceed(kind, count, config) {
+            if let Some(oracle_state) = oracle(constraint, self, config) {
+                return oracle_state;
+            }
+            return State::fail();
+        } else {
+            let mut st = self.with_subst_and_count(vec![constraint.clone()], new_subst, step);
+            st.binding_counts.add_count(kind, count);
+            st
+        }
     }
 }
 

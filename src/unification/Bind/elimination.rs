@@ -1,9 +1,9 @@
 // src/unification/elimination_for_f.rs
 
 use crate::{
-    counter::{BindingKind, Config, try_binding},
+    counter::{BindingKind, Config},
     term::{Constraint, Term, TermKind, Type, Var, Variable},
-    tree::State,
+    tree::{State, Step},
     unification::unification_utils::{build_bound_vars, flatten_hnf, init_fresh_gen},
 };
 use Type::Arrow;
@@ -36,13 +36,13 @@ pub fn apply_elimination(
             let lam = build_lambda(term, &f_name, &alphas, &beta, &seq);
             let sigma2 = state.subst.clone().push(f_name.clone(), lam);
             let removed_args = n - seq.len();
-            let new_state = try_binding(
-                state,
+            let new_state = state.try_binding(
                 BindingKind::Elimination,
                 removed_args,
                 constraint,
                 sigma2,
                 config,
+                Step::Elimination,
             );
             result_states.push(new_state);
         }
@@ -51,7 +51,7 @@ pub fn apply_elimination(
     result_states
 }
 
-//lle Kombinationen der Länge k aus indices in steigender Reihenfolge
+//Alle Kombinationen der Länge k aus indices in steigender Reihenfolge
 fn combinations(indices: &[usize], k: usize) -> Vec<Vec<usize>> {
     fn rec(
         input: &[usize],

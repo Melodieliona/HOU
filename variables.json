@@ -1,1 +1,25 @@
-[]
+[
+  {
+    "name": "F",
+    "term_kind": "FVar",
+    "ty": {
+      "Arrow": [
+        "Bool",
+        "Nat"
+      ]
+    },
+    "var": "Basic"
+  },
+  {
+    "name": "a",
+    "term_kind": "Const",
+    "ty": "Bool",
+    "var": "Basic"
+  },
+  {
+    "name": "G",
+    "term_kind": "FVar",
+    "ty": "Nat",
+    "var": "Basic"
+  }
+]

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::term::*;
-use crate::tree::State;
+use crate::tree::{State, Step};
 use crate::unification::unification_utils::*;
 
 // Prüft, ob beide Seiten λ-Abstraktionen sind mit m ≥ n und entweder unterschiedliche Binder-Namen oder m > n.
@@ -16,7 +16,7 @@ pub fn is_normalizable_an(lhs: &Term, rhs: &Term) -> bool {
 
 // Wendet die an-Normierung an:
 pub fn apply_normalize_an(constraint: Constraint, state: &State) -> Vec<State> {
-    let subst = &state.subst.clone();
+    let subst = &state.subst;
     let Constraint(lhs, rhs) = constraint;
 
     let (lhs_vars, _) = collect_lambdas(&lhs);
@@ -30,7 +30,8 @@ pub fn apply_normalize_an(constraint: Constraint, state: &State) -> Vec<State> {
     let new_rhs = wrap_with_abstractions(&applied_args, &lhs_vars);
 
     let new_constraint = Constraint(lhs.clone(), new_rhs);
-    let new_state = state.with_subst_and_count(vec![new_constraint], subst.clone());
+    let new_state =
+        state.with_subst_and_count(vec![new_constraint], subst.clone(), Step::NormalizeAn);
     vec![new_state]
 }
 

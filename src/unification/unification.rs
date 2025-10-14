@@ -9,10 +9,10 @@ use crate::unification::*;
 // und liefert eine Liste von Folge-States zurück.
 pub fn apply_unify_rules(constraint: Constraint, state: &State, config: &Config) -> Vec<State> {
     let Constraint(lhs, rhs) = constraint.clone();
+    println!("Constraint: {}", constraint);
+    println!("Subst: {}", state.subst);
 
-    println!("Const : {}", &constraint);
     if let Some(fallback) = oracle::oracle(&constraint, state, config) {
-        println!("Config : {:?}", &config);
         return vec![fallback];
     }
 

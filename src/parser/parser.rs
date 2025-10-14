@@ -38,7 +38,15 @@ fn parse_constraint(tokens: &[Token], all_vars: &[Variable]) -> Result<Constrain
     if right_pos != right_tokens.len() {
         return Err(ParseError::LengthMismatch((right_pos, right_tokens.len())));
     }
-
+    // Typprüfung: beide Seiten müssen denselben Typ haben
+    let left_ty = left.get_type();
+    let right_ty = right.get_type();
+    if left_ty != right_ty {
+        return Err(ParseError::TypeMismatch {
+            expected: left_ty,
+            found: right_ty,
+        });
+    }
     Ok(Constraint(left, right))
 }
 

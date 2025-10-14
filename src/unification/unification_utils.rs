@@ -137,8 +137,8 @@ pub fn flatten_hnf(term: &Term) -> (Vec<Variable>, Term, Vec<Term>) {
     let mut args = Vec::new();
     let mut head = cur.clone();
     while let Term::App { func, arg, .. } = head {
-        args.push(arg.as_ref().clone());
-        head = func.as_ref().clone();
+        args.push(*arg);
+        head = *func;
     }
     args.reverse();
 

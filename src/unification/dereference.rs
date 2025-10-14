@@ -7,7 +7,7 @@ use crate::unification::unification_utils::wrap_with_abstractions;
 //Dereference ({
 // λx.F s ? = λx.t}⊎E,σ) −→ ({λx.(σF)s ? = λx.t}⊎E,σ)
 pub fn is_dereference(lhs: &Term, rhs: &Term, state: &State) -> bool {
-    let subst = &state.subst.clone();
+    let subst = &state.subst;
     let (binders_l, head_l, _core_l) = flatten_hnf(lhs);
     let (binders_r, head_r, _core_r) = flatten_hnf(rhs);
     //identisch und nicht leer
@@ -26,21 +26,21 @@ pub fn is_dereference(lhs: &Term, rhs: &Term, state: &State) -> bool {
 
 //Wendet Dereference an:
 pub fn apply_dereference(constraint: Constraint, state: &State) -> Vec<State> {
-    let subst = &state.subst.clone();
+    let subst = &state.subst;
     let Constraint(lhs, rhs) = constraint;
     let (_binders_l, _head_l, _core_l) = flatten_hnf(&lhs);
     let (_binders_r, _head_r, _core_r) = flatten_hnf(&rhs);
 
     //Einmal F und einmal G falls vorhanden
-    let new_lhs = dereference(&lhs, &subst);
-    let new_rhs = dereference(&rhs, &subst);
+    let new_lhs = dereference(lhs, &subst);
+    let new_rhs = dereference(rhs, &subst);
 
     let new_const = Constraint(new_lhs, new_rhs);
-    let new_state = state.with_subst_and_count(vec![new_const], subst.clone());
+    let new_state = state.with_subst_and_count(vec![new_const], subst.clone(), Step::Dereference);
     vec![new_state]
 }
 
-fn dereference(lhs: &Term, subst: &PersistentSubst) -> Term {
+fn dereference(lhs: Term, subst: &PersistentSubst) -> Term {
     //Entferne lambda
     let (binders, head, args) = flatten_hnf(&lhs);
 
@@ -51,7 +51,7 @@ fn dereference(lhs: &Term, subst: &PersistentSubst) -> Term {
         var: _,
     }) = head
     else {
-        return lhs.clone();
+        return lhs;
     };
 
     //Hole F->Subst
@@ -60,14 +60,14 @@ fn dereference(lhs: &Term, subst: &PersistentSubst) -> Term {
     let new_head = match mapping.get(&f) {
         Some(term) => term.clone(),
         None => {
-            return lhs.clone();
+            return lhs;
         }
     };
 
     let result = apply_with(new_head, &args, |t| t.clone());
 
     if !binders.is_empty() {
-        let result = wrap_with_abstractions(&result.clone(), &binders.clone());
+        let result = wrap_with_abstractions(&result, &binders);
         return result;
     }
     result

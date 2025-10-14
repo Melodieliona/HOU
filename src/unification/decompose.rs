@@ -1,5 +1,5 @@
 use crate::term::{Constraint, Term};
-use crate::tree::State;
+use crate::tree::{State, Step};
 use crate::unification::unification_utils::*;
 
 //True, falls selbe Binder, Köpfe und Länge
@@ -23,5 +23,5 @@ pub fn apply_decompose(constraint: Constraint, state: &State) -> Vec<State> {
         .map(|(l, r)| Constraint(l.clone(), r.clone()))
         .collect();
 
-    vec![state.with_subst_and_count(new_constraints, subst.clone())]
+    vec![state.with_subst_and_count(new_constraints, subst.clone(), Step::Decompose)]
 }

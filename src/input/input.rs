@@ -27,7 +27,6 @@ pub fn run_loop(all_var: &mut Vec<Variable>) -> io::Result<()> {
 
 // Fügt neue Variablen hinzu, liest Constraints, konfiguriert und startet die Unifikation
 fn handle_next(all_var: &mut Vec<Variable>) -> io::Result<()> {
-    add_variable("variables.json", all_var)?;
     let constraints = read_constraints(all_var)?;
     let initial = State::new(constraints);
     println!("\n--- Binding-Limits konfigurieren ---");
@@ -48,6 +47,7 @@ fn handle_new(all_var: &mut Vec<Variable>, name: String) -> io::Result<()> {
             Ok(var) => {
                 println!("Variable gespeichert: {:?}", var);
                 all_var.push(var);
+                add_variable("variables.json", all_var)?;
             }
             Err(err) => eprintln!("{}", err),
         }
@@ -59,6 +59,7 @@ fn handle_new(all_var: &mut Vec<Variable>, name: String) -> io::Result<()> {
 fn handle_delete(all_var: &mut Vec<Variable>, name: &str) {
     if let Some(idx) = all_var.iter().position(|v| v.name == name) {
         let removed = all_var.remove(idx);
+        let _ = add_variable("variables.json", all_var);
         println!("Gelöscht: {}", removed);
     } else {
         println!("Keine Variable namens '{}'", name);

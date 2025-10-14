@@ -1,7 +1,4 @@
 use crate::input::reader::prompt;
-use crate::term::*;
-use crate::tree::{PersistentSubst, State};
-use crate::unification::bind::oracle::oracle;
 use std::io;
 use std::io::Write;
 
@@ -95,27 +92,6 @@ impl BindingCounts {
         };
         let total_over = self.total.saturating_add(count) > config.max_total;
         art_over || total_over
-    }
-}
-
-// Versucht eine Bindung anzuwenden oder liefert einen fehlgeschlagenen State
-pub fn try_binding(
-    state: &State,
-    kind: BindingKind,
-    count: usize,
-    constraint: &Constraint,
-    new_subst: PersistentSubst,
-    config: &Config,
-) -> State {
-    if state.binding_counts.would_exceed(kind, count, config) {
-        if let Some(oracle_state) = oracle(constraint, state, config) {
-            return oracle_state;
-        }
-        return State::fail();
-    } else {
-        let mut st = state.with_subst_and_count(vec![constraint.clone()], new_subst);
-        st.binding_counts.add_count(kind, count);
-        st
     }
 }
 
